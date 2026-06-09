@@ -1,0 +1,65 @@
+# ---------- OS / Editor ----------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ---------- Node / Next.js ----------
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+.next-env.d.ts
+next-env.d.ts
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.venv/
+venv/
+.env.python
+
+# ---------- Secrets / Env ----------
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ---------- Logs ----------
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# ---------- ML artifacts (local only) ----------
+*.pt
+*.onnx
+*.tflite
+*.pkl
+models/local/
+data/local/
+
+# ---------- Docker / Infra local state ----------
+infra/.volumes/
+
+# ---------- Legacy archive ----------
+_legacy/
+
+# ---------- Claude Code (machine-local) ----------
+.claude/settings.local.json

@@ -1,0 +1,38 @@
+name: victus-ai
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: victus-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-victus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-victus_dev_only_change_me}
+      POSTGRES_DB: ${POSTGRES_DB:-victus}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-victus} -d ${POSTGRES_DB:-victus}",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    command:
+      - postgres
+      - -c
+      - log_statement=none
+      - -c
+      - log_min_duration_statement=250
+      - -c
+      - shared_buffers=256MB
+
+volumes:
+  postgres_data:
+    name: victus_postgres_data
