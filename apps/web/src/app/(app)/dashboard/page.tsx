@@ -7,7 +7,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { auth } from '@/lib/auth';
-import { grantConsentAndEnterAction } from '@/server/consent-actions';
+
+import { GrantConsentButton } from './grant-consent-button';
 
 const REASON_COPY: Record<string, string> = {
   role: 'Your account role is not permitted for that pathway.',
@@ -113,21 +114,10 @@ function PathwayCard({
             <Link href={href}>Start session</Link>
           </Button>
         ) : decision.reason === 'consent' ? (
-          <form
-            action={grantConsentAndEnterAction.bind(
-              null,
-              decision.missing as ConsentType[],
-              href,
-            )}
-          >
-            <p className="mb-3 text-sm text-brand-600">
-              This pathway needs your consent:{' '}
-              <span className="font-medium text-brand-800">
-                {decision.missing.join(', ')}
-              </span>
-            </p>
-            <Button type="submit">Grant consent &amp; start</Button>
-          </form>
+          <GrantConsentButton
+            consents={decision.missing as ConsentType[]}
+            href={href}
+          />
         ) : (
           <p className="text-sm text-brand-600">{describe(decision)}</p>
         )}

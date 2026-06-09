@@ -1,42 +1,34 @@
 'use server';
 
-import { redirect } from 'next/navigation';
-
 import type { ConsentType } from '@victus/contracts';
 
 import { ApiError, apiClient } from '@/lib/api-client';
-import { auth, unstable_update } from '@/lib/auth';
+import { auth } from '@/lib/auth';
+
+export type GrantConsentResult = { ok: true } | { ok: false; error: string };
 
 /**
- * Grant the given consents for the signed-in user, then enter a pathway.
- *
- * The pathway gate reads `session.user.consents` from the Auth.js JWT, so after
- * persisting the grant via the API we call `unstable_update({})` to re-run the
- * `jwt` callback (its `trigger === 'update'` branch re-fetches `/users/me`).
- * That refreshes the token's consents in place, so the subsequent redirect into
- * the pathway succeeds without forcing the user to sign out and back in.
- *
- * Designed for use as a bound `<form action>`; the FormData Next passes to the
- * bound action is ignored — every input comes from the bound arguments.
+ * Persist consent grants for the signed-in user. Returns a result the caller
+ * can surface; the client then calls `useSession().update()` to refresh the
+ * JWT's consents in place before navigating into the pathway — so no
+ * sign-out/in is required.
  */
-export async function grantConsentAndEnterAction(
+export async function grantConsentAction(
   consents: ConsentType[],
-  redirectTo: string,
-): Promise<void> {
+): Promise<GrantConsentResult> {
   const session = await auth();
-  if (!session?.user) redirect('/login?reason=session_expired');
-
-  if (consents.length > 0) {
-    try {
-      await apiClient.updateConsents(session.accessToken, { grants: consents });
-    } catch (err) {
-      if (err instanceof ApiError) {
-        redirect('/dashboard?consent_error=1');
-      }
-      throw err;
-    }
-    await unstable_update({});
+  if (!session?.user) {
+    return { ok: false, error: 'Your session has expired — please sign in again.' };
   }
+  if (consents.length === 0) return { ok: true };
 
-  redirect(redirectTo);
+  try {
+    await apiClient.updateConsents(session.accessToken, { grants: consents });
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof ApiError) {
+      return { ok: false, error: err.message };
+    }
+    return { ok: false, error: 'Could not record your consent. Please try again.' };
+  }
 }

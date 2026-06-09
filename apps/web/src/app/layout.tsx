@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 
 import './globals.css';
+import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: {
@@ -31,7 +32,9 @@ export default function RootLayout({
 }): React.ReactElement {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-dvh bg-brand-50 text-brand-950 antialiased">{children}</body>
+      <body className="min-h-dvh bg-brand-50 text-brand-950 antialiased">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
