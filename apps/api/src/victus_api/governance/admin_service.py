@@ -48,7 +48,6 @@ from victus_api.governance.admin_schemas import (
 from victus_api.governance.schemas import (
     ErasureBasis,
     ErasureJurisdiction,
-    ErasureRequestResponse,
     ErasureStatus,
     ErasureTargetType,
 )
@@ -59,7 +58,6 @@ from victus_api.governance.service import (
     _create_subject_anonymisation_request,
     _execute_account_erasure,
     _execute_subject_anonymisation,
-    _request_to_response,
 )
 from victus_api.notifications.schemas import NotificationType
 from victus_api.notifications.service import notify_user
@@ -241,6 +239,48 @@ async def admin_user_data_summary(
 # --- Erasure / anonymisation (admin-initiated) ------------------------------
 
 
+async def _resolve_admin_response(
+    db: AsyncSession, req: ErasureRequest
+) -> AdminErasureRequestResponse:
+    """Build the full admin DTO for a single request — the same shape the
+    ledger returns, with actor/target/approver/rejecter emails resolved — so
+    the maker-checker endpoints surface attribution (``requires_approval``,
+    ``approved_by_*``, ``rejected_by_*``) directly instead of forcing the
+    caller to re-query the ledger.
+    """
+
+    async def _email(user_id: uuid.UUID | None) -> str | None:
+        if user_id is None:
+            return None
+        user = await db.get(User, user_id)
+        return user.email if user is not None else None
+
+    return AdminErasureRequestResponse(
+        id=req.id,
+        requesting_actor_user_id=req.requesting_actor_user_id,
+        requesting_actor_email=await _email(req.requesting_actor_user_id),
+        target_user_id=req.target_user_id,
+        target_user_email=await _email(req.target_user_id),
+        target_type=ErasureTargetType(req.target_type.value),
+        target_id=req.target_id,
+        jurisdiction=ErasureJurisdiction(req.jurisdiction.value),
+        request_basis=ErasureBasis(req.request_basis.value),
+        requested_at=req.requested_at,
+        processed_at=req.processed_at,
+        status=ErasureStatus(req.status.value),
+        statutory_retention_applied=req.statutory_retention_applied,
+        notes=req.notes,
+        requires_approval=req.requires_approval,
+        approved_by_user_id=req.approved_by_user_id,
+        approved_by_email=await _email(req.approved_by_user_id),
+        approved_at=req.approved_at,
+        rejected_by_user_id=req.rejected_by_user_id,
+        rejected_by_email=await _email(req.rejected_by_user_id),
+        rejected_at=req.rejected_at,
+        rejection_reason=req.rejection_reason,
+    )
+
+
 async def admin_propose_erase_account(
     db: AsyncSession,
     *,
@@ -250,7 +290,7 @@ async def admin_propose_erase_account(
     settings: Settings,
     ip_address: str | None,
     user_agent: str | None,
-) -> ErasureRequestResponse:
+) -> AdminErasureRequestResponse:
     """Maker step — propose an account erasure for a second admin to approve.
 
     Creates an AWAITING_APPROVAL request and notifies eligible checkers; the
@@ -281,7 +321,7 @@ async def admin_propose_erase_account(
         ip_address=ip_address,
         user_agent=user_agent,
     )
-    return _request_to_response(request_row)
+    return await _resolve_admin_response(db, request_row)
 
 
 async def admin_propose_anonymise_subject(
@@ -293,7 +333,7 @@ async def admin_propose_anonymise_subject(
     settings: Settings,
     ip_address: str | None,
     user_agent: str | None,
-) -> ErasureRequestResponse:
+) -> AdminErasureRequestResponse:
     """Maker step — propose a cross-tenant subject anonymisation."""
     subject = await db.get(StudySubject, subject_id)
     if subject is None:
@@ -311,7 +351,7 @@ async def admin_propose_anonymise_subject(
         ip_address=ip_address,
         user_agent=user_agent,
     )
-    return _request_to_response(request_row)
+    return await _resolve_admin_response(db, request_row)
 
 
 async def admin_approve_erasure_request(
@@ -322,7 +362,7 @@ async def admin_approve_erasure_request(
     settings: Settings,
     ip_address: str | None,
     user_agent: str | None,
-) -> ErasureRequestResponse:
+) -> AdminErasureRequestResponse:
     """Checker step — approve a pending request and execute it.
 
     Enforces segregation of duties: the approver MUST differ from the maker.
@@ -404,7 +444,7 @@ async def admin_approve_erasure_request(
         maker_user_id=str(req.requesting_actor_user_id),
         target_type=req.target_type.value,
     )
-    return _request_to_response(req)
+    return await _resolve_admin_response(db, req)
 
 
 async def admin_reject_erasure_request(
@@ -416,7 +456,7 @@ async def admin_reject_erasure_request(
     settings: Settings,
     ip_address: str | None,
     user_agent: str | None,
-) -> ErasureRequestResponse:
+) -> AdminErasureRequestResponse:
     """Checker step — reject a pending request. No data is touched."""
     req = await db.get(ErasureRequest, request_id)
     if req is None:
@@ -470,7 +510,7 @@ async def admin_reject_erasure_request(
         checker_user_id=str(checker.id),
         maker_user_id=str(req.requesting_actor_user_id),
     )
-    return _request_to_response(req)
+    return await _resolve_admin_response(db, req)
 
 
 # --- Platform-wide ledger + audit query -------------------------------------

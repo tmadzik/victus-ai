@@ -134,6 +134,9 @@ def test_governance_maker_checker_lifecycle(client: Any) -> None:
     assert propose.status_code in (200, 201, 202), propose.text
     request_id = propose.json()["id"]
     assert propose.json()["status"] == "AWAITING_APPROVAL"
+    # the propose response surfaces maker-checker attribution directly now,
+    # not only via the ledger
+    assert propose.json()["requires_approval"] is True
 
     # the checker is notified that an approval is pending
     assert unread_count(client, checker["headers"]) >= base_unread + 1
@@ -164,7 +167,11 @@ def test_governance_maker_checker_lifecycle(client: Any) -> None:
         json={},
     )
     assert approve.status_code in (200, 201), approve.text
-    assert approve.json()["status"] == "COMPLETED"
+    approved = approve.json()
+    assert approved["status"] == "COMPLETED"
+    # the approve response carries approver attribution directly
+    assert approved["approved_by_user_id"] == checker["id"]
+    assert approved["approved_by_email"] == checker["email"]
 
     # approver attribution recorded (visible on the ledger)
     completed = client.get(
