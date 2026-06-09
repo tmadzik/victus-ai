@@ -1,0 +1,85 @@
+@import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+   Victus AI design tokens
+   --------------------------------------------------------------------------- */
+
+@theme {
+  --font-sans:
+    'Inter Variable', 'Inter', ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+
+  /* Brand */
+  --color-brand-50: oklch(0.98 0.02 220);
+  --color-brand-100: oklch(0.95 0.04 220);
+  --color-brand-200: oklch(0.9 0.07 220);
+  --color-brand-300: oklch(0.82 0.11 220);
+  --color-brand-400: oklch(0.72 0.14 220);
+  --color-brand-500: oklch(0.62 0.16 220);
+  --color-brand-600: oklch(0.52 0.16 220);
+  --color-brand-700: oklch(0.43 0.14 220);
+  --color-brand-800: oklch(0.34 0.11 220);
+  --color-brand-900: oklch(0.25 0.08 220);
+  --color-brand-950: oklch(0.18 0.06 220);
+
+  /* Clinical state palette — Pathway A drives every result UI off these. */
+  --color-state-green-fg: oklch(0.36 0.08 150);
+  --color-state-green-bg: oklch(0.96 0.04 150);
+  --color-state-green-ring: oklch(0.62 0.16 150);
+
+  --color-state-yellow-fg: oklch(0.4 0.1 80);
+  --color-state-yellow-bg: oklch(0.97 0.05 80);
+  --color-state-yellow-ring: oklch(0.7 0.15 80);
+
+  --color-state-red-fg: oklch(0.36 0.13 25);
+  --color-state-red-bg: oklch(0.96 0.04 25);
+  --color-state-red-ring: oklch(0.55 0.2 25);
+
+  --radius-card: 0.75rem;
+  --radius-control: 0.5rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Base layer
+   --------------------------------------------------------------------------- */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    color-scheme: light dark;
+  }
+
+  body {
+    background-color: white;
+    color: oklch(0.15 0 0);
+    min-height: 100dvh;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+
+  /* WCAG: respect reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
