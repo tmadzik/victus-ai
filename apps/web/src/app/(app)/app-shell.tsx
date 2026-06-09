@@ -49,9 +49,11 @@ export function AppShell({
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <Link
             href="/dashboard"
-            className="text-sm font-semibold uppercase tracking-[0.2em] text-brand-900"
+            className="flex items-center"
+            aria-label="Victus AI — go to dashboard"
           >
-            Victus AI
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/victus-logo.svg" alt="Victus AI" className="h-9 w-auto" />
           </Link>
           <nav aria-label="Primary" className="hidden gap-1 md:flex">
             {navItems.map((item) => {

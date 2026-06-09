@@ -14,10 +14,13 @@ export default async function TriagePage(): Promise<React.ReactElement> {
   const session = await auth();
   if (!session?.user) redirect('/login');
 
+  // Gate on the CURRENT consents (source of truth), not the JWT — so a consent
+  // just granted on the dashboard takes effect on this navigation.
+  const me = await apiClient.me(session.accessToken);
   const decision = userMayEnterPathway(
     PathwayKind.A_TRIAGE,
     session.user.role,
-    session.user.consents,
+    me.consents,
   );
   if (!decision.allowed) {
     redirect(`/dashboard?blocked_by=${decision.reason}&pathway=A_TRIAGE`);

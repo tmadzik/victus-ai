@@ -15,10 +15,12 @@ export default async function TOIPage(): Promise<React.ReactElement> {
   const session = await auth();
   if (!session?.user) redirect('/login');
 
+  // Gate on the CURRENT consents (source of truth), not the JWT.
+  const me = await apiClient.me(session.accessToken);
   const decision = userMayEnterPathway(
     PathwayKind.B_TOI,
     session.user.role,
-    session.user.consents,
+    me.consents,
   );
   if (!decision.allowed) {
     redirect(`/dashboard?blocked_by=${decision.reason}&pathway=B_TOI`);

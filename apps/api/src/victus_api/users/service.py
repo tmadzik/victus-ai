@@ -41,21 +41,28 @@ async def update_consents(
             )
 
     for consent_type in payload.grants:
+        # Match any prior record for this (user, type, version) regardless of
+        # revoked state — the unique constraint covers all three columns, so a
+        # previously-revoked row must be REACTIVATED rather than re-inserted.
         existing = await db.scalar(
             select(ConsentRecord)
             .where(ConsentRecord.user_id == user.id)
             .where(ConsentRecord.consent_type == consent_type)
             .where(ConsentRecord.version == payload.version)
-            .where(ConsentRecord.revoked_at.is_(None))
         )
+        if existing is not None and existing.revoked_at is None:
+            continue  # already actively granted — idempotent no-op
         if existing is not None:
-            continue
-        record = ConsentRecord(
-            user_id=user.id,
-            consent_type=consent_type,
-            version=payload.version,
-        )
-        db.add(record)
+            existing.revoked_at = None
+            existing.granted_at = now
+        else:
+            db.add(
+                ConsentRecord(
+                    user_id=user.id,
+                    consent_type=consent_type,
+                    version=payload.version,
+                )
+            )
         await write_audit(
             db,
             action=AuditAction.CONSENT_GRANTED,

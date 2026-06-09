@@ -129,3 +129,31 @@ def test_history_records_assessments(client: Any, patient: dict[str, Any]) -> No
     body = resp.json()
     items = body if isinstance(body, list) else body.get("items") or body.get("assessments")
     assert items is not None and len(items) >= 2
+
+
+def test_consent_regrant_after_revoke(client: Any) -> None:
+    """Re-granting a previously-revoked consent must reactivate the record, not
+    fail on the (user, consent_type, version) unique constraint."""
+    user = register(client, "PATIENT")
+    headers = user["headers"]
+
+    def current() -> list[str]:
+        r = client.get("/users/me", headers=headers)
+        assert r.status_code == 200, r.text
+        return r.json()["consents"]
+
+    g = client.patch("/users/me/consents", headers=headers,
+                     json={"grants": ["TRIAGE"], "revokes": []})
+    assert g.status_code == 200, g.text
+    assert "TRIAGE" in current()
+
+    rv = client.patch("/users/me/consents", headers=headers,
+                      json={"grants": [], "revokes": ["TRIAGE"]})
+    assert rv.status_code == 200, rv.text
+    assert "TRIAGE" not in current()
+
+    # Previously raised "A database constraint was violated."
+    rg = client.patch("/users/me/consents", headers=headers,
+                      json={"grants": ["TRIAGE"], "revokes": []})
+    assert rg.status_code == 200, rg.text
+    assert "TRIAGE" in current()

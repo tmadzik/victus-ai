@@ -1,12 +1,15 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
-import { PathwayKind, userMayEnterPathway } from '@victus/contracts';
+import { type ConsentType, PathwayKind, userMayEnterPathway } from '@victus/contracts';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { apiClient } from '@/lib/api-client';
 import { auth } from '@/lib/auth';
+
+import { GrantConsentButton } from './grant-consent-button';
 
 const REASON_COPY: Record<string, string> = {
   role: 'Your account role is not permitted for that pathway.',
@@ -24,16 +27,16 @@ export default async function DashboardPage({
   const params = await searchParams;
   const blocker = params.blocked_by ? REASON_COPY[params.blocked_by] : null;
 
-  const a = userMayEnterPathway(
-    PathwayKind.A_TRIAGE,
-    session.user.role,
-    session.user.consents,
-  );
-  const b = userMayEnterPathway(
-    PathwayKind.B_TOI,
-    session.user.role,
-    session.user.consents,
-  );
+  // Read current consents from the source of truth so the cards reflect a
+  // grant immediately (the JWT may lag a freshly-granted consent).
+  let consents = session.user.consents;
+  try {
+    consents = (await apiClient.me(session.accessToken)).consents;
+  } catch {
+    // fall back to the token's consents if the fresh fetch fails
+  }
+  const a = userMayEnterPathway(PathwayKind.A_TRIAGE, session.user.role, consents);
+  const b = userMayEnterPathway(PathwayKind.B_TOI, session.user.role, consents);
 
   return (
     <div className="space-y-8">
@@ -65,15 +68,13 @@ export default async function DashboardPage({
           title="Pathway A — 3B-Triage"
           description="Non-clinical NCD risk via tape-measure + symptom audit. Evidential network outputs GREEN / YELLOW / RED with calibrated uncertainty."
           href="/triage"
-          enabled={a.allowed}
-          requirement={a.allowed ? null : describe(a)}
+          decision={a}
         />
         <PathwayCard
           title="Pathway B — TOI"
           description="Camera-based rPPG biomarkers (HR, RR, BP, HRV, Stress, CVD risk) optimized for Fitzpatrick III–VI via CHROM / POS."
           href="/toi"
-          enabled={b.allowed}
-          requirement={b.allowed ? null : describe(b)}
+          decision={b}
         />
       </section>
     </div>
@@ -94,28 +95,32 @@ function PathwayCard({
   title,
   description,
   href,
-  enabled,
-  requirement,
+  decision,
 }: {
   title: string;
   description: string;
   href: '/triage' | '/toi';
-  enabled: boolean;
-  requirement: string | null;
+  decision: ReturnType<typeof userMayEnterPathway>;
 }): React.ReactElement {
+  const enabled = decision.allowed;
   return (
-    <Card className={enabled ? '' : 'opacity-70'}>
+    <Card className={enabled ? '' : 'opacity-90'}>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
-      <CardContent className="flex items-center justify-between">
+      <CardContent>
         {enabled ? (
           <Button asChild>
             <Link href={href}>Start session</Link>
           </Button>
+        ) : decision.reason === 'consent' ? (
+          <GrantConsentButton
+            consents={decision.missing as ConsentType[]}
+            href={href}
+          />
         ) : (
-          <p className="text-sm text-brand-600">{requirement}</p>
+          <p className="text-sm text-brand-600">{describe(decision)}</p>
         )}
       </CardContent>
     </Card>
