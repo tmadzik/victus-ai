@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API — lint, migrations, integration tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: victus
+          POSTGRES_PASSWORD: victus_dev_only_change_me
+          POSTGRES_DB: victus
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U victus -d victus"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      # Point the app and Alembic at the service container. conftest sees
+      # DATABASE_URL and skips its pgserver auto-provisioner.
+      DATABASE_URL: postgresql+asyncpg://victus:victus_dev_only_change_me@localhost:5432/victus
+      ALEMBIC_DATABASE_URL: postgresql+psycopg://victus:victus_dev_only_change_me@localhost:5432/victus
+      API_ENV: test
+      JWT_SECRET_KEY: ci-jwt-secret-000000000000000000000000000000000000
+      INTERNAL_SERVICE_TOKEN: ci-internal-token-000000000000000000
+      PSEUDO_SALT: ci-pseudo-salt-0000000000000000000000000000000000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          python-version: "3.12"
+
+      - name: Sync dependencies (dev + ml)
+        run: uv sync --extra dev --extra ml
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Apply migrations
+        run: uv run alembic upgrade head
+
+      - name: Migration down/up round-trip (reversibility)
+        run: |
+          uv run alembic downgrade base
+          uv run alembic upgrade head
+
+      - name: Pytest (integration vs real Postgres)
+        run: uv run pytest
+
+  web:
+    name: Web — typecheck, lint, build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Enable corepack (pins pnpm from packageManager)
+        run: corepack enable
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (contracts + web)
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8099
+          INTERNAL_API_BASE_URL: http://localhost:8099
+          INTERNAL_SERVICE_TOKEN: ci-internal-token-000000000000000000
+          AUTH_SECRET: ci-auth-secret-00000000000000000000000000000000
+          AUTH_URL: http://localhost:3000
+          AUTH_TRUST_HOST: "true"
+          NEXT_TELEMETRY_DISABLED: "1"
