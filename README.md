@@ -1,5 +1,7 @@
 # Victus AI
 
+[![CI](https://github.com/tmadzik/victus-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/tmadzik/victus-ai/actions/workflows/ci.yml)
+
 Dual-pathway NCD risk prediction and Transdermal Optical Imaging biomarker platform engineered for clinical-validation deployment in Sub-Saharan African settings.
 
 - **Pathway A — 3B-Triage:** Non-clinical NCD risk screening (Obesity / Hypertension / Diabetes) via tape-measure inputs and symptom audit. Dirichlet-EDL classifier with a gradient-reversal domain adversary trained to be invariant across `{CLINICAL_GRADE, CHW_TAPE_MEASURE, SYNTHETIC}` measurement provenance — tape-measure inputs collected by community health workers behave the same as clinical-grade inputs by construction. Epistemic/aleatoric uncertainty drives a strict GREEN / YELLOW / RED state machine. Hard-coded deterministic safety overrides (polydipsia, blurred vision, non-healing foot sores) bypass the network and escalate to RED.
