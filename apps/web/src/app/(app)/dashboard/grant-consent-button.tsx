@@ -1,7 +1,5 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 
 import type { ConsentType } from '@victus/contracts';
@@ -10,11 +8,10 @@ import { Button } from '@/components/ui/button';
 import { grantConsentAction } from '@/server/consent-actions';
 
 /**
- * Grant the consent a pathway requires, then enter it — without a sign-out/in.
+ * Grant the consent a pathway requires, then enter it — no sign-out/in.
  *
- * Flow: persist the grant (server action) → `update()` to re-run the Auth.js
- * `jwt` callback (which re-fetches `/users/me`, refreshing `session.user.consents`)
- * → navigate into the pathway and revalidate server components.
+ * The grant is persisted (server action) and the pathway page re-reads the
+ * current consents server-side, so a plain navigation is enough.
  */
 export function GrantConsentButton({
   consents,
@@ -23,8 +20,6 @@ export function GrantConsentButton({
   consents: ConsentType[];
   href: '/triage' | '/toi';
 }): React.ReactElement {
-  const { update } = useSession();
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -36,9 +31,7 @@ export function GrantConsentButton({
         setError(result.error);
         return;
       }
-      await update();
-      router.push(href);
-      router.refresh();
+      window.location.assign(href);
     });
   };
 

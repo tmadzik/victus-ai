@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server';
 
 import { auth } from '@/lib/auth';
-import { PathwayKind, userMayEnterPathway } from '@victus/contracts';
 
-const PATHWAY_PATHS: Record<string, PathwayKind> = {
-  '/triage': PathwayKind.A_TRIAGE,
-  '/toi': PathwayKind.B_TOI,
-};
-
+// Pathway consent/role gating is enforced in the pathway pages against the
+// CURRENT consents (a fresh `/users/me`), not the JWT — so a just-granted
+// consent takes effect immediately without waiting for the token to refresh.
+// The middleware only handles auth-level concerns.
 export default auth((request) => {
   const { auth: session, nextUrl } = request;
-  const { pathname } = nextUrl;
 
   if (!session?.user) {
     return NextResponse.next();
@@ -21,23 +18,6 @@ export default auth((request) => {
     loginUrl.pathname = '/login';
     loginUrl.searchParams.set('reason', 'session_expired');
     return NextResponse.redirect(loginUrl);
-  }
-
-  for (const [prefix, pathway] of Object.entries(PATHWAY_PATHS)) {
-    if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
-      const decision = userMayEnterPathway(
-        pathway,
-        session.user.role,
-        session.user.consents,
-      );
-      if (!decision.allowed) {
-        const dashboardUrl = nextUrl.clone();
-        dashboardUrl.pathname = '/dashboard';
-        dashboardUrl.searchParams.set('blocked_by', decision.reason);
-        dashboardUrl.searchParams.set('pathway', pathway);
-        return NextResponse.redirect(dashboardUrl);
-      }
-    }
   }
 
   return NextResponse.next();

@@ -6,6 +6,7 @@ import { type ConsentType, PathwayKind, userMayEnterPathway } from '@victus/cont
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { apiClient } from '@/lib/api-client';
 import { auth } from '@/lib/auth';
 
 import { GrantConsentButton } from './grant-consent-button';
@@ -26,16 +27,16 @@ export default async function DashboardPage({
   const params = await searchParams;
   const blocker = params.blocked_by ? REASON_COPY[params.blocked_by] : null;
 
-  const a = userMayEnterPathway(
-    PathwayKind.A_TRIAGE,
-    session.user.role,
-    session.user.consents,
-  );
-  const b = userMayEnterPathway(
-    PathwayKind.B_TOI,
-    session.user.role,
-    session.user.consents,
-  );
+  // Read current consents from the source of truth so the cards reflect a
+  // grant immediately (the JWT may lag a freshly-granted consent).
+  let consents = session.user.consents;
+  try {
+    consents = (await apiClient.me(session.accessToken)).consents;
+  } catch {
+    // fall back to the token's consents if the fresh fetch fails
+  }
+  const a = userMayEnterPathway(PathwayKind.A_TRIAGE, session.user.role, consents);
+  const b = userMayEnterPathway(PathwayKind.B_TOI, session.user.role, consents);
 
   return (
     <div className="space-y-8">

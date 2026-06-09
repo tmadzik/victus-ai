@@ -8,10 +8,9 @@ import { auth } from '@/lib/auth';
 export type GrantConsentResult = { ok: true } | { ok: false; error: string };
 
 /**
- * Persist consent grants for the signed-in user. Returns a result the caller
- * can surface; the client then calls `useSession().update()` to refresh the
- * JWT's consents in place before navigating into the pathway — so no
- * sign-out/in is required.
+ * Persist consent grants for the signed-in user and return a result the caller
+ * can surface. The pathway pages re-read the current consents server-side, so a
+ * plain navigation after this resolves enters the pathway — no sign-out/in.
  */
 export async function grantConsentAction(
   consents: ConsentType[],
