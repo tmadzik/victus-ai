@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
-import { PathwayKind, userMayEnterPathway } from '@victus/contracts';
+import { type ConsentType, PathwayKind, userMayEnterPathway } from '@victus/contracts';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { auth } from '@/lib/auth';
+import { grantConsentAndEnterAction } from '@/server/consent-actions';
 
 const REASON_COPY: Record<string, string> = {
   role: 'Your account role is not permitted for that pathway.',
@@ -65,15 +66,13 @@ export default async function DashboardPage({
           title="Pathway A — 3B-Triage"
           description="Non-clinical NCD risk via tape-measure + symptom audit. Evidential network outputs GREEN / YELLOW / RED with calibrated uncertainty."
           href="/triage"
-          enabled={a.allowed}
-          requirement={a.allowed ? null : describe(a)}
+          decision={a}
         />
         <PathwayCard
           title="Pathway B — TOI"
           description="Camera-based rPPG biomarkers (HR, RR, BP, HRV, Stress, CVD risk) optimized for Fitzpatrick III–VI via CHROM / POS."
           href="/toi"
-          enabled={b.allowed}
-          requirement={b.allowed ? null : describe(b)}
+          decision={b}
         />
       </section>
     </div>
@@ -94,28 +93,43 @@ function PathwayCard({
   title,
   description,
   href,
-  enabled,
-  requirement,
+  decision,
 }: {
   title: string;
   description: string;
   href: '/triage' | '/toi';
-  enabled: boolean;
-  requirement: string | null;
+  decision: ReturnType<typeof userMayEnterPathway>;
 }): React.ReactElement {
+  const enabled = decision.allowed;
   return (
-    <Card className={enabled ? '' : 'opacity-70'}>
+    <Card className={enabled ? '' : 'opacity-90'}>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
-      <CardContent className="flex items-center justify-between">
+      <CardContent>
         {enabled ? (
           <Button asChild>
             <Link href={href}>Start session</Link>
           </Button>
+        ) : decision.reason === 'consent' ? (
+          <form
+            action={grantConsentAndEnterAction.bind(
+              null,
+              decision.missing as ConsentType[],
+              href,
+            )}
+          >
+            <p className="mb-3 text-sm text-brand-600">
+              This pathway needs your consent:{' '}
+              <span className="font-medium text-brand-800">
+                {decision.missing.join(', ')}
+              </span>
+            </p>
+            <Button type="submit">Grant consent &amp; start</Button>
+          </form>
         ) : (
-          <p className="text-sm text-brand-600">{requirement}</p>
+          <p className="text-sm text-brand-600">{describe(decision)}</p>
         )}
       </CardContent>
     </Card>
