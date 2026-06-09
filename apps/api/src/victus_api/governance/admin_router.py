@@ -33,7 +33,6 @@ from victus_api.governance.admin_service import (
     admin_reject_erasure_request,
     admin_user_data_summary,
 )
-from victus_api.governance.schemas import ErasureRequestResponse
 
 router = APIRouter(prefix="/governance/admin", tags=["governance-admin"])
 
@@ -82,7 +81,7 @@ async def user_data_summary_endpoint(
 
 @router.post(
     "/users/{user_id}/erase",
-    response_model=ErasureRequestResponse,
+    response_model=AdminErasureRequestResponse,
     status_code=status.HTTP_200_OK,
     summary=(
         "MAKER: propose erasure of another user's account (regulator-forwarded "
@@ -97,7 +96,7 @@ async def propose_erase_user_endpoint(
     db: DbSession,
     admin: AdminUser,
     settings: Annotated[Settings, Depends(get_settings)],
-) -> ErasureRequestResponse:
+) -> AdminErasureRequestResponse:
     ip, ua = _client_metadata(request)
     return await admin_propose_erase_account(
         db,
@@ -112,7 +111,7 @@ async def propose_erase_user_endpoint(
 
 @router.post(
     "/subjects/{subject_id}/anonymise",
-    response_model=ErasureRequestResponse,
+    response_model=AdminErasureRequestResponse,
     status_code=status.HTTP_200_OK,
     summary=(
         "MAKER: propose cross-tenant anonymisation of a study subject. "
@@ -126,7 +125,7 @@ async def propose_anonymise_subject_endpoint(
     db: DbSession,
     admin: AdminUser,
     settings: Annotated[Settings, Depends(get_settings)],
-) -> ErasureRequestResponse:
+) -> AdminErasureRequestResponse:
     ip, ua = _client_metadata(request)
     return await admin_propose_anonymise_subject(
         db,
@@ -141,7 +140,7 @@ async def propose_anonymise_subject_endpoint(
 
 @router.post(
     "/erasure-requests/{request_id}/approve",
-    response_model=ErasureRequestResponse,
+    response_model=AdminErasureRequestResponse,
     status_code=status.HTTP_200_OK,
     summary=(
         "CHECKER: approve a pending erasure request and execute it. The "
@@ -154,7 +153,7 @@ async def approve_erasure_request_endpoint(
     db: DbSession,
     admin: AdminUser,
     settings: Annotated[Settings, Depends(get_settings)],
-) -> ErasureRequestResponse:
+) -> AdminErasureRequestResponse:
     ip, ua = _client_metadata(request)
     return await admin_approve_erasure_request(
         db,
@@ -168,7 +167,7 @@ async def approve_erasure_request_endpoint(
 
 @router.post(
     "/erasure-requests/{request_id}/reject",
-    response_model=ErasureRequestResponse,
+    response_model=AdminErasureRequestResponse,
     status_code=status.HTTP_200_OK,
     summary="CHECKER: reject a pending erasure request. No data is touched.",
 )
@@ -179,7 +178,7 @@ async def reject_erasure_request_endpoint(
     db: DbSession,
     admin: AdminUser,
     settings: Annotated[Settings, Depends(get_settings)],
-) -> ErasureRequestResponse:
+) -> AdminErasureRequestResponse:
     ip, ua = _client_metadata(request)
     return await admin_reject_erasure_request(
         db,
