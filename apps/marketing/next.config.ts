@@ -1,15 +1,22 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import type { NextConfig } from 'next';
+
+const monorepoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Self-contained production server for cPanel (Passenger / "Setup Node.js
+  // App") — `pnpm build:cpanel` packages .next/standalone into a deployable
+  // bundle with node_modules included, so the host never runs `npm install`.
+  output: 'standalone',
+  outputFileTracingRoot: monorepoRoot,
   experimental: {
     typedRoutes: true,
-    serverActions: {
-      bodySizeLimit: '2mb',
-    },
   },
-  transpilePackages: ['@victus/contracts', '@victus/ui'],
+  transpilePackages: ['@victus/ui'],
   async headers() {
     const securityHeaders = [
       { key: 'X-DNS-Prefetch-Control', value: 'on' },
@@ -18,7 +25,7 @@ const nextConfig: NextConfig = {
       { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
       {
         key: 'Permissions-Policy',
-        value: 'camera=(self), microphone=(), geolocation=(), interest-cohort=()',
+        value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
       },
       {
         key: 'Strict-Transport-Security',

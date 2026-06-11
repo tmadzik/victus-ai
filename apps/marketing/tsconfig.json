@@ -12,7 +12,6 @@
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./src/*"],
-      "@victus/contracts": ["../../packages/contracts/src"],
       "@victus/ui": ["../../packages/ui/src"]
     }
   },
@@ -21,7 +20,6 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    "../../packages/contracts/src/**/*.ts",
     "../../packages/ui/src/**/*.ts",
     "../../packages/ui/src/**/*.tsx"
   ],

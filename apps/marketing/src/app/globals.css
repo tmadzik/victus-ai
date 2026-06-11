@@ -6,3 +6,9 @@
 
 /* Tailwind must scan the shared component sources for class names. */
 @source '../../../../packages/ui/src';
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+}
