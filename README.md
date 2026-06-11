@@ -25,6 +25,8 @@ Dual-pathway NCD risk prediction and Transdermal Optical Imaging biomarker platf
 
 The marketing site and the clinical app are deployed independently (separate domains, separate pipelines) but share one visual language through `@victus/ui`: design tokens live in `packages/ui/src/styles.css` and base primitives (Button, Card, Input, Label, Badge, Alert) are imported from `@victus/ui` by both apps. Auth cookies are scoped strictly to the app subdomain — the marketing site carries no authentication and no clinical data.
 
+The marketing site deploys to cPanel as a self-contained Node.js bundle (`pnpm --filter @victus/marketing build:cpanel`) — see [apps/marketing/DEPLOYMENT.md](apps/marketing/DEPLOYMENT.md). Pilot-request leads are forwarded via SMTP and/or a CRM webhook (`SMTP_*`, `LEAD_NOTIFY_*`, `CRM_WEBHOOK_*` in `.env.example`).
+
 Authentication is FastAPI-owned (argon2id + JWT access/refresh + audit log). Auth.js acts as the Next.js-side session container, proxying credentials to `/auth/login` and forwarding the access token to FastAPI on subsequent requests, refreshing transparently when the access token nears expiry.
 
 ## Prerequisites

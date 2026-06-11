@@ -2,6 +2,8 @@
 
 import { z } from 'zod';
 
+import { forwardLead } from '@/lib/leads';
+
 export interface PilotRequestState {
   status: 'idle' | 'success' | 'error';
   message: string;
@@ -17,6 +19,11 @@ const HONEYPOT_FIELD = 'company_website';
 /** Bots submit instantly; humans take at least a moment. */
 const MIN_SUBMIT_DELAY_MS = 2_000;
 
+const SUCCESS: PilotRequestState = {
+  status: 'success',
+  message: 'Thank you — our team will be in touch shortly.',
+};
+
 export async function requestPilot(
   _prev: PilotRequestState,
   formData: FormData,
@@ -28,7 +35,7 @@ export async function requestPilot(
 
   // Silently accept bot traffic so automated scripts learn nothing.
   if ((typeof honeypot === 'string' && honeypot.length > 0) || submittedTooFast) {
-    return { status: 'success', message: 'Thank you — our team will be in touch shortly.' };
+    return SUCCESS;
   }
 
   const parsed = pilotRequestSchema.safeParse({ email: formData.get('email') });
@@ -40,12 +47,41 @@ export async function requestPilot(
   }
 
   // POPIA: submission is explicit consent to be contacted about the platform —
-  // persist the consent timestamp alongside the lead when the CRM is wired up.
-  // TODO(crm): forward to the sales pipeline (CRM / transactional email).
-  console.info('[pilot-request]', {
+  // the consent timestamp travels with the lead on every channel.
+  const lead = {
     email: parsed.data.email,
     consentAt: new Date().toISOString(),
-  });
+    source: 'www.victusdata.com/#request-pilot',
+  };
 
-  return { status: 'success', message: 'Thank you — our team will be in touch shortly.' };
+  const result = await forwardLead(lead);
+
+  if (result.unconfigured) {
+    // Dev / misconfigured deployment: never lose the lead silently.
+    console.error(
+      '[pilot-request] NO DELIVERY CHANNEL CONFIGURED — set SMTP_* + LEAD_NOTIFY_TO ' +
+        'and/or CRM_WEBHOOK_URL. Lead logged below so it is not lost:',
+      lead,
+    );
+    return SUCCESS;
+  }
+
+  const failed = result.channels.filter((c) => !c.ok);
+  if (failed.length > 0) {
+    console.error('[pilot-request] channel failure(s):', failed, 'lead:', lead);
+  }
+
+  if (!result.delivered) {
+    return {
+      status: 'error',
+      message: 'Something went wrong on our side. Please email pilots@victusdata.com directly.',
+    };
+  }
+
+  console.info('[pilot-request] delivered', {
+    email: lead.email,
+    consentAt: lead.consentAt,
+    channels: result.channels.map((c) => c.name),
+  });
+  return SUCCESS;
 }
