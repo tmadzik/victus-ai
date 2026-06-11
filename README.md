@@ -12,15 +12,18 @@ Dual-pathway NCD risk prediction and Transdermal Optical Imaging biomarker platf
 ```
 .
 ├── apps/
-│   ├── web/                Next.js 15 (App Router, RSC, TS strict, Tailwind v4, Auth.js v5)
+│   ├── web/                Clinical app — app.victusdata.com (Next.js 15, App Router, RSC, TS strict, Tailwind v4, Auth.js v5)
+│   ├── marketing/          Marketing site — www.victusdata.com (Next.js 15, fully static SSG, zero auth/PHI)
 │   └── api/                FastAPI (Python 3.12, SQLAlchemy 2.x async, Pydantic v2, PyTorch)
 ├── packages/
 │   ├── contracts/          Shared DTO + role/consent enums (TS)
-│   └── ui/                 Shared design primitives (TS, reserved)
+│   └── ui/                 Shared design system — tokens (styles.css) + primitives consumed by web and marketing
 ├── infra/
 │   └── docker-compose.yml  Postgres + (later) inference runtime
 └── _legacy/                Archived pre-rebuild static scaffold
 ```
+
+The marketing site and the clinical app are deployed independently (separate domains, separate pipelines) but share one visual language through `@victus/ui`: design tokens live in `packages/ui/src/styles.css` and base primitives (Button, Card, Input, Label, Badge, Alert) are imported from `@victus/ui` by both apps. Auth cookies are scoped strictly to the app subdomain — the marketing site carries no authentication and no clinical data.
 
 Authentication is FastAPI-owned (argon2id + JWT access/refresh + audit log). Auth.js acts as the Next.js-side session container, proxying credentials to `/auth/login` and forwarding the access token to FastAPI on subsequent requests, refreshing transparently when the access token nears expiry.
 
@@ -53,8 +56,8 @@ pnpm api:migrate
 # Terminal 1 — FastAPI
 pnpm api:dev          # http://localhost:8000  (Swagger UI: /docs)
 
-# Terminal 2 — Next.js
-pnpm dev              # http://localhost:3000
+# Terminal 2 — Next.js (runs both: clinical app + marketing site)
+pnpm dev              # web: http://localhost:3000 · marketing: http://localhost:3001
 ```
 
 ## Verify

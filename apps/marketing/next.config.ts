@@ -5,11 +5,8 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   experimental: {
     typedRoutes: true,
-    serverActions: {
-      bodySizeLimit: '2mb',
-    },
   },
-  transpilePackages: ['@victus/contracts', '@victus/ui'],
+  transpilePackages: ['@victus/ui'],
   async headers() {
     const securityHeaders = [
       { key: 'X-DNS-Prefetch-Control', value: 'on' },
@@ -18,7 +15,7 @@ const nextConfig: NextConfig = {
       { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
       {
         key: 'Permissions-Policy',
-        value: 'camera=(self), microphone=(), geolocation=(), interest-cohort=()',
+        value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
       },
       {
         key: 'Strict-Transport-Security',
