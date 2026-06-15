@@ -44,9 +44,15 @@ SEO penalties.
 > cookie on the parent `.victusdata.com` domain, or the marketing site would
 > start carrying session state it must not have.
 
-## 1. Build the bundle (local machine or CI)
+## 1. Build the bundle (local machine)
+
+Build on **Node 20** so the bundle matches the cPanel runtime. The repo pins it
+via `.nvmrc`:
 
 ```bash
+nvm use            # selects Node 20 (per .nvmrc) — or `nvm install 20` first
+corepack enable    # once per machine, activates the pinned pnpm
+
 # From the repo root. NEXT_PUBLIC_APP_URL is inlined at build time —
 # set it to the real app subdomain before building.
 NEXT_PUBLIC_APP_URL=https://app.victusdata.com \
@@ -62,19 +68,15 @@ PORT=3001 node apps/marketing/.next/standalone/app.js
 # → http://localhost:3001
 ```
 
-**Prefer CI for the production artifact.** The
-`.github/workflows/release-marketing.yml` workflow builds the zip on Linux
-(matching the cPanel host), so you never hand-build on macOS:
+> This site uses no `next/image` runtime optimisation and generates its OG
+> image at build time, so the bundle carries no platform-specific native code
+> that runs on the server — a macOS-built bundle runs correctly on Linux
+> cPanel. Building on Node 20 keeps the build major aligned with the host.
 
-- **Publish a GitHub Release** → the bundle is built and attached to that
-  release as `victus-marketing-cpanel-<tag>.zip`. Download it and skip to
-  step 2.
-- **Actions → "Release — marketing cPanel bundle" → Run workflow** → builds and
-  uploads the zip as a downloadable workflow artifact (no release needed).
-
-The workflow bakes in `NEXT_PUBLIC_APP_URL` from the repo variable of the same
-name (default `https://app.victusdata.com`), or the value you type when running
-it manually.
+> **Optional CI fallback.** A dormant `.github/workflows/release-marketing.yml`
+> can build the same zip on Linux (on a published Release, or via **Actions →
+> Run workflow**) if you ever want to build off-machine. It is not required for
+> this deploy flow.
 
 ## 2. Create the Node.js app in cPanel
 

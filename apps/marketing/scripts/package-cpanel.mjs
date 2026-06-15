@@ -40,11 +40,18 @@ cpSync(path.join(appDir, 'public'), path.join(appInStandalone, 'public'), { recu
 
 // Passenger startup shim at the bundle root. cPanel's "Setup Node.js App"
 // points its startup file here; Passenger provides PORT via env.
+//
+// The Next standalone server.js is an ES module, so the shim loads it with a
+// dynamic import() rather than require() — require() of ESM throws on Node 20
+// (the cPanel runtime), even though Node 22+ permits it.
 writeFileSync(
   path.join(standaloneDir, 'app.js'),
   [
     "process.chdir(__dirname + '/apps/marketing');",
-    "require('./apps/marketing/server.js');",
+    "import('./apps/marketing/server.js').catch((err) => {",
+    '  console.error(err);',
+    '  process.exit(1);',
+    '});',
     '',
   ].join('\n'),
 );
