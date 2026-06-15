@@ -582,3 +582,314 @@ def _evaluate_dann(
         per_domain_task_accuracy=per_domain,
         grl_lambda_final=grl_lambda,
     )
+
+
+# ---------------------------------------------------------------------------
+# Multi-head (per-disease) DANN training
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class MultiHeadDannMetrics:
+    """Per-disease calibration metrics + aggregate domain-invariance metrics.
+
+    ``per_disease`` maps each disease label to its own :class:`CalibrationMetrics`
+    (accuracy / macro-F1 / ECE / Brier / vacuity). The aggregate ``mean_*``
+    fields are the unweighted average across diseases — a single headline number
+    for the multi-task model. Domain metrics are shared (one domain head).
+    """
+
+    per_disease: dict[str, CalibrationMetrics]
+    mean_accuracy: float
+    mean_macro_f1: float
+    mean_ece: float
+    domain_accuracy: float
+    domain_chance: float
+    per_domain_mean_task_accuracy: dict[str, float]
+    grl_lambda_final: float
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "per_disease": {k: v.to_dict() for k, v in self.per_disease.items()},
+            "mean_accuracy": self.mean_accuracy,
+            "mean_macro_f1": self.mean_macro_f1,
+            "mean_ece": self.mean_ece,
+            "domain_accuracy": self.domain_accuracy,
+            "domain_chance": self.domain_chance,
+            "per_domain_mean_task_accuracy": self.per_domain_mean_task_accuracy,
+            "grl_lambda_final": self.grl_lambda_final,
+        }
+
+
+def train_multihead_dann_evidential_model(
+    *,
+    model: nn.Module,
+    x_train: np.ndarray,
+    y_train: np.ndarray,  # (N, num_diseases) int labels
+    d_train: np.ndarray,
+    x_val: np.ndarray,
+    y_val: np.ndarray,  # (N, num_diseases)
+    d_val: np.ndarray,
+    num_classes: int,
+    num_domains: int,
+    num_diseases: int,
+    disease_labels: tuple[str, ...],
+    domain_labels: tuple[str, ...],
+    epochs: int = 120,
+    batch_size: int = 128,
+    lr: float = 1e-3,
+    weight_decay: float = 1e-4,
+    annealing_epochs: int = 240,
+    grl_gamma: float = 10.0,
+    class_balanced: bool = True,
+    focal_gamma: float = 0.0,
+    device: torch.device | None = None,
+    seed: int = 17,
+) -> tuple[MultiHeadDannMetrics, list[dict[str, float]]]:
+    """Train the shared-trunk, per-disease-head DANN evidential model.
+
+    The task loss is the (disease-averaged) sum of per-disease Sensoy EDL
+    losses; the domain head is trained adversarially through the GRL exactly as
+    in the single-head variant. Batches are domain-balanced so the adversary
+    cannot win by exploiting raw domain frequency; per-disease class imbalance
+    is handled by per-head ``class_weights`` in the EDL fit term.
+    """
+    device = device or torch.device("cpu")
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
+    model = model.to(device)
+    optim = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+
+    x_t = torch.from_numpy(x_train.astype(np.float32))
+    y_t = torch.from_numpy(y_train.astype(np.int64))  # (N, num_diseases)
+    d_t = torch.from_numpy(d_train.astype(np.int64))
+    y_oh = torch.nn.functional.one_hot(y_t, num_classes=num_classes).float()  # (N, D, K)
+    train_set: TensorDataset = TensorDataset(x_t, y_t, y_oh, d_t)
+    sampler = _domain_balanced_sampler(d_train, seed=seed)
+    train_loader: DataLoader[tuple[Tensor, Tensor, Tensor, Tensor]] = DataLoader(
+        train_set, batch_size=batch_size, sampler=sampler, drop_last=False
+    )
+
+    # Per-disease balanced class weights for the EDL fit term.
+    class_weights_t: list[Tensor | None] = []
+    for i in range(num_diseases):
+        if class_balanced:
+            cw = compute_balanced_class_weights(y_train[:, i], num_classes=num_classes)
+            class_weights_t.append(torch.from_numpy(cw).to(device))
+        else:
+            class_weights_t.append(None)
+
+    x_v = torch.from_numpy(x_val.astype(np.float32))
+    y_v = torch.from_numpy(y_val.astype(np.int64))
+    d_v = torch.from_numpy(d_val.astype(np.int64))
+    y_v_oh = torch.nn.functional.one_hot(y_v, num_classes=num_classes).float()
+    val_set: TensorDataset = TensorDataset(x_v, y_v, y_v_oh, d_v)
+    val_loader: DataLoader[tuple[Tensor, Tensor, Tensor, Tensor]] = DataLoader(
+        val_set, batch_size=512, shuffle=False, drop_last=False
+    )
+
+    ce = nn.CrossEntropyLoss()
+    grl_lambda_final = 0.0
+    history: list[dict[str, float]] = []
+    for epoch in range(1, epochs + 1):
+        model.train()
+        running_task = 0.0
+        running_dom = 0.0
+        n_seen = 0
+        grl_lambda = _grl_lambda(epoch / max(1, epochs), grl_gamma)
+        for xb, _, yb_oh, db in train_loader:
+            xb = xb.to(device)
+            yb_oh = yb_oh.to(device)
+            db = db.to(device)
+            optim.zero_grad(set_to_none=True)
+            evidences, domain_logits = model(xb, grl_alpha=grl_lambda)
+            task_loss = xb.new_zeros(())
+            for i in range(num_diseases):
+                task_loss = task_loss + edl_mse_loss(
+                    evidences[i],
+                    yb_oh[:, i, :],
+                    epoch=epoch,
+                    annealing_epochs=annealing_epochs,
+                    class_weights=class_weights_t[i],
+                    focal_gamma=focal_gamma,
+                )
+            task_loss = task_loss / num_diseases
+            dom_loss = ce(domain_logits, db)
+            loss = task_loss + dom_loss
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+            optim.step()
+            running_task += float(task_loss.detach()) * xb.shape[0]
+            running_dom += float(dom_loss.detach()) * xb.shape[0]
+            n_seen += xb.shape[0]
+        train_task_loss = running_task / max(n_seen, 1)
+        train_dom_loss = running_dom / max(n_seen, 1)
+        grl_lambda_final = grl_lambda
+
+        metrics = _evaluate_multihead_dann(
+            model,
+            val_loader,
+            device=device,
+            epoch=epoch,
+            annealing_epochs=annealing_epochs,
+            grl_lambda=grl_lambda,
+            num_classes=num_classes,
+            num_domains=num_domains,
+            num_diseases=num_diseases,
+            disease_labels=disease_labels,
+            domain_labels=domain_labels,
+        )
+        history.append(
+            {
+                "epoch": epoch,
+                "grl_lambda": grl_lambda,
+                "train_task_loss": train_task_loss,
+                "train_domain_loss": train_dom_loss,
+                "val_mean_accuracy": metrics.mean_accuracy,
+                "val_mean_ece": metrics.mean_ece,
+                "val_domain_accuracy": metrics.domain_accuracy,
+            }
+        )
+        if epoch == 1 or epoch % 5 == 0 or epoch == epochs:
+            log.info(
+                "multihead_dann_epoch",
+                epoch=epoch,
+                grl_lambda=round(grl_lambda, 3),
+                task_loss=round(train_task_loss, 4),
+                domain_loss=round(train_dom_loss, 4),
+                mean_acc=round(metrics.mean_accuracy, 4),
+                mean_ece=round(metrics.mean_ece, 4),
+                domain_acc=round(metrics.domain_accuracy, 4),
+                per_disease_acc={
+                    k: round(v.accuracy, 3) for k, v in metrics.per_disease.items()
+                },
+            )
+
+    final = _evaluate_multihead_dann(
+        model,
+        val_loader,
+        device=device,
+        epoch=epochs,
+        annealing_epochs=annealing_epochs,
+        grl_lambda=grl_lambda_final,
+        num_classes=num_classes,
+        num_domains=num_domains,
+        num_diseases=num_diseases,
+        disease_labels=disease_labels,
+        domain_labels=domain_labels,
+    )
+    return final, history
+
+
+def _evaluate_multihead_dann(
+    model: nn.Module,
+    loader: DataLoader[tuple[Tensor, Tensor, Tensor, Tensor]],
+    *,
+    device: torch.device,
+    epoch: int,
+    annealing_epochs: int,
+    grl_lambda: float,
+    num_classes: int,
+    num_domains: int,
+    num_diseases: int,
+    disease_labels: tuple[str, ...],
+    domain_labels: tuple[str, ...],
+) -> MultiHeadDannMetrics:
+    model.eval()
+    # Per-disease accumulators.
+    confs: list[list[np.ndarray]] = [[] for _ in range(num_diseases)]
+    preds: list[list[np.ndarray]] = [[] for _ in range(num_diseases)]
+    targets: list[list[np.ndarray]] = [[] for _ in range(num_diseases)]
+    vacuities: list[list[np.ndarray]] = [[] for _ in range(num_diseases)]
+    val_losses = [0.0 for _ in range(num_diseases)]
+    domains: list[np.ndarray] = []
+    domain_preds: list[np.ndarray] = []
+    n_seen = 0
+    with torch.no_grad():
+        for xb, yb, yb_oh, db in loader:
+            xb = xb.to(device)
+            yb_oh = yb_oh.to(device)
+            db = db.to(device)
+            evidences, domain_logits = model(xb, grl_alpha=grl_lambda)
+            n_seen += xb.shape[0]
+            for i in range(num_diseases):
+                loss = edl_mse_loss(
+                    evidences[i],
+                    yb_oh[:, i, :],
+                    epoch=epoch,
+                    annealing_epochs=annealing_epochs,
+                )
+                val_losses[i] += float(loss) * xb.shape[0]
+                alpha = evidences[i] + 1.0
+                strength = alpha.sum(dim=-1, keepdim=True)
+                probs = (alpha / strength).cpu().numpy()
+                vac = (num_classes / strength.squeeze(-1)).cpu().numpy()
+                confs[i].append(probs)
+                preds[i].append(probs.argmax(axis=-1))
+                targets[i].append(yb[:, i].numpy())
+                vacuities[i].append(vac)
+            domains.append(db.cpu().numpy())
+            domain_preds.append(domain_logits.argmax(dim=-1).cpu().numpy())
+
+    domains_arr = np.concatenate(domains, axis=0)
+    domain_preds_arr = np.concatenate(domain_preds, axis=0)
+    domain_accuracy = float((domain_preds_arr == domains_arr).mean())
+
+    per_disease: dict[str, CalibrationMetrics] = {}
+    # per-domain accumulated task accuracy across diseases
+    per_domain_sums: dict[int, list[float]] = {d: [] for d in range(num_domains)}
+    for i in range(num_diseases):
+        probs_arr = np.concatenate(confs[i], axis=0)
+        preds_arr = np.concatenate(preds[i], axis=0)
+        targets_arr = np.concatenate(targets[i], axis=0)
+        vac_arr = np.concatenate(vacuities[i], axis=0)
+        accuracy = float((preds_arr == targets_arr).mean())
+        macro_f1 = _macro_f1(preds_arr, targets_arr, num_classes=num_classes)
+        ece = _expected_calibration_error(probs_arr, targets_arr, n_bins=15)
+        brier = _brier_multiclass(probs_arr, targets_arr, num_classes=num_classes)
+        correct_mask = preds_arr == targets_arr
+        mean_u_correct = (
+            float(vac_arr[correct_mask].mean()) if correct_mask.any() else 0.0
+        )
+        mean_u_incorrect = (
+            float(vac_arr[~correct_mask].mean()) if (~correct_mask).any() else 0.0
+        )
+        label = disease_labels[i] if i < len(disease_labels) else f"disease_{i}"
+        per_disease[label] = CalibrationMetrics(
+            accuracy=accuracy,
+            macro_f1=macro_f1,
+            expected_calibration_error=ece,
+            brier_score=brier,
+            mean_vacuity_correct=mean_u_correct,
+            mean_vacuity_incorrect=mean_u_incorrect,
+            val_loss=val_losses[i] / max(n_seen, 1),
+        )
+        for d_idx in range(num_domains):
+            mask = domains_arr == d_idx
+            if mask.any():
+                per_domain_sums[d_idx].append(
+                    float((preds_arr[mask] == targets_arr[mask]).mean())
+                )
+
+    mean_accuracy = float(np.mean([m.accuracy for m in per_disease.values()]))
+    mean_macro_f1 = float(np.mean([m.macro_f1 for m in per_disease.values()]))
+    mean_ece = float(
+        np.mean([m.expected_calibration_error for m in per_disease.values()])
+    )
+    per_domain_mean: dict[str, float] = {}
+    for d_idx in range(num_domains):
+        label = domain_labels[d_idx] if d_idx < len(domain_labels) else f"d{d_idx}"
+        accs = per_domain_sums[d_idx]
+        per_domain_mean[label] = float(np.mean(accs)) if accs else float("nan")
+
+    return MultiHeadDannMetrics(
+        per_disease=per_disease,
+        mean_accuracy=mean_accuracy,
+        mean_macro_f1=mean_macro_f1,
+        mean_ece=mean_ece,
+        domain_accuracy=domain_accuracy,
+        domain_chance=1.0 / num_domains,
+        per_domain_mean_task_accuracy=per_domain_mean,
+        grl_lambda_final=grl_lambda,
+    )

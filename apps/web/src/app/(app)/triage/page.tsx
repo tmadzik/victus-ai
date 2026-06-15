@@ -46,17 +46,22 @@ export default async function TriagePage(): Promise<React.ReactElement> {
       </header>
 
       <Alert tone="info">
-        <AlertTitle>How the state machine works</AlertTitle>
+        <AlertTitle>How the per-disease state machine works</AlertTitle>
         <AlertDescription>
-          <span className="font-semibold">GREEN</span> when the top class is{' '}
-          <code className="font-mono">LOW_RISK</code> and vacuity{' '}
+          Obesity, hypertension and diabetes are each scored independently —
+          their own Dirichlet, their own uncertainty, their own state. The
+          overall referral state is the worst of the three. <br />
+          <span className="font-semibold">GREEN</span> when a disease&apos;s top
+          class is <code className="font-mono">LOW_RISK</code> and vacuity{' '}
           <code className="font-mono">u &lt; 0.5</code>. <br />
           <span className="font-semibold">YELLOW</span> when vacuity exceeds the
-          threshold, plausibility flags fire, or the top class is elevated with
-          sub-threshold confidence. <br />
-          <span className="font-semibold">RED</span> on safety override OR
+          threshold (e.g. diabetes inferred from adiposity proxies, or
+          hypertension without a cuff reading), plausibility flags fire, or the
+          top class is elevated with sub-threshold confidence. <br />
+          <span className="font-semibold">RED</span> on safety override OR a
           high-confidence <code className="font-mono">HIGH_RISK</code>/
-          <code className="font-mono">VERY_HIGH_RISK</code> with low vacuity.
+          <code className="font-mono">VERY_HIGH_RISK</code> classification with
+          low vacuity on any single disease.
         </AlertDescription>
       </Alert>
 

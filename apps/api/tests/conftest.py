@@ -52,9 +52,17 @@ _set_default("JWT_SECRET_KEY", "test-jwt-secret-" + "0" * 40)
 _set_default("INTERNAL_SERVICE_TOKEN", "test-internal-token-" + "0" * 24)
 _set_default("PSEUDO_SALT", "test-pseudo-salt-" + "0" * 40)
 
-_TRIAGE_MODEL = _API_ROOT / "models" / "triage_edl_v1_demo.pt"
-if _TRIAGE_MODEL.exists():
-    _set_default("VICTUS_TRIAGE_MODEL_PATH", str(_TRIAGE_MODEL))
+# Prefer the per-disease multi-head checkpoint; fall back to the legacy
+# single-head demo checkpoint if the newer artifact is absent. (The legacy
+# checkpoint no longer satisfies the multi-head loader and will gracefully
+# degrade to the rule-based per-disease backend.)
+for _candidate in (
+    _API_ROOT / "models" / "triage_edl_multihead_v1.pt",
+    _API_ROOT / "models" / "triage_edl_v1_demo.pt",
+):
+    if _candidate.exists():
+        _set_default("VICTUS_TRIAGE_MODEL_PATH", str(_candidate))
+        break
 
 
 def _socket_dir_from_uri(uri: str) -> str:

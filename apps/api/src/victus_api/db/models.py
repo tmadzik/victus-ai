@@ -351,6 +351,13 @@ class TriageAssessment(Base):
     aleatoric_uncertainty: Mapped[float] = mapped_column(Float, nullable=False)
     epistemic_uncertainty: Mapped[float] = mapped_column(Float, nullable=False)
     dirichlet_strength: Mapped[float] = mapped_column(Float, nullable=False)
+    # The single-risk columns above hold the *overall summary* (the worst-state
+    # disease) for backward compatibility and indexing. The authoritative,
+    # independently-weighted per-disease breakdown lives here as a list of
+    # serialized ``PerDiseaseRisk`` objects (one per disease in ``DISEASES``).
+    per_disease_risks: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
     raw_inputs: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     derived_features: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default="{}"

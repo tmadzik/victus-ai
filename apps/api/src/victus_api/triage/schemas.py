@@ -40,6 +40,22 @@ RISK_CLASSES: tuple[RiskClass, ...] = (
 )
 
 
+class Disease(str, enum.Enum):
+    """The three NCDs screened by Pathway A, each weighted independently."""
+
+    OBESITY = "OBESITY"
+    HYPERTENSION = "HYPERTENSION"
+    DIABETES = "DIABETES"
+
+
+# Fixed order — used for the model's per-disease heads and the UI layout.
+DISEASES: tuple[Disease, ...] = (
+    Disease.OBESITY,
+    Disease.HYPERTENSION,
+    Disease.DIABETES,
+)
+
+
 class TriageState(str, enum.Enum):
     GREEN = "GREEN"
     YELLOW = "YELLOW"
@@ -57,6 +73,18 @@ SAFETY_OVERRIDE_SYMPTOM_KEYS: frozenset[str] = frozenset(
         "unexplained_weight_loss_recent",
     }
 )
+
+# Which disease a red-flag symptom escalates to RED (in addition to forcing the
+# overall state to RED). Drives per-disease referral on safety override.
+SAFETY_OVERRIDE_DISEASE: dict[str, Disease] = {
+    "polydipsia_unquenchable_thirst": Disease.DIABETES,
+    "polyuria_nocturia_severe": Disease.DIABETES,
+    "non_healing_foot_sore": Disease.DIABETES,
+    "unexplained_weight_loss_recent": Disease.DIABETES,
+    "blurred_vision_progressive": Disease.DIABETES,
+    "chest_pain_radiating": Disease.HYPERTENSION,
+    "severe_headache_with_visual_change": Disease.HYPERTENSION,
+}
 
 CONTEXTUAL_SYMPTOM_KEYS: frozenset[str] = frozenset(
     {
@@ -133,15 +161,27 @@ class TriageUncertainty(BaseModel):
     strength: Annotated[float, Field(gt=0.0)]
 
 
-class TriageAssessmentResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid", from_attributes=True)
+class PerDiseaseRisk(BaseModel):
+    """Independent evidential risk assessment for a single NCD."""
 
-    id: uuid.UUID
+    model_config = ConfigDict(extra="forbid")
+
+    disease: Disease
     state: TriageState
     top_class: RiskClass
     class_probabilities: dict[RiskClass, float]
     evidence: dict[RiskClass, float]
     uncertainty: TriageUncertainty
+    contributing_factors: list[str]
+    next_action: str
+
+
+class TriageAssessmentResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+    id: uuid.UUID
+    overall_state: TriageState
+    per_disease: list[PerDiseaseRisk]
     derived_features: DerivedFeatures
     plausibility_flags: list[PlausibilityFlag]
     safety_override_triggered: bool
