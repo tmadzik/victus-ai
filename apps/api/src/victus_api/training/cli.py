@@ -56,14 +56,17 @@ from victus_api.training.harmonize import (
 from victus_api.training.loop import (
     train_dann_evidential_model,
     train_evidential_model,
+    train_multihead_dann_evidential_model,
 )
 from victus_api.training.scaling import StandardScaler
 from victus_api.triage.edl.dirichlet import (
     build_dann_evidential_model,
     build_evidential_mlp,
+    build_multihead_dann_model,
 )
+from victus_api.triage.edl.inference import per_disease_label_from_features
 from victus_api.triage.features import FEATURE_NAMES
-from victus_api.triage.schemas import RISK_CLASSES
+from victus_api.triage.schemas import DISEASES, RISK_CLASSES
 
 DEFAULT_HIDDEN_DIMS: tuple[int, ...] = (64, 32)
 DEFAULT_DATA_DIR = Path(
@@ -78,6 +81,76 @@ def _build_matrix(
     y = np.asarray([CLASS_INDEX[r.risk_class] for r in records], dtype=np.int64)
     d = np.asarray([DOMAIN_INDEX[r.domain] for r in records], dtype=np.int64)
     return x, y, d
+
+
+def _build_multihead_matrix(
+    records: list[HarmonizedRecord],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Feature matrix + (N, num_diseases) per-disease label matrix + domains.
+
+    Per-disease labels are derived from each record's physiology using the same
+    clinical thresholds the runtime falls back to, so the trained multi-head
+    model is a smooth, domain-invariant, calibrated version of that mapping.
+    """
+    x = np.asarray([r.feature_vector() for r in records], dtype=np.float32)
+    label_rows: list[list[int]] = []
+    for r in records:
+        bmi, whtr, _whr, _pulse = r.derived()
+        labels = per_disease_label_from_features(
+            bmi=bmi,
+            whtr=whtr,
+            systolic=r.systolic_bp_mmhg,
+            diastolic=r.diastolic_bp_mmhg,
+            age=r.age_years,
+        )
+        label_rows.append([CLASS_INDEX[labels[disease]] for disease in DISEASES])
+    y = np.asarray(label_rows, dtype=np.int64)
+    d = np.asarray([DOMAIN_INDEX[r.domain] for r in records], dtype=np.int64)
+    return x, y, d
+
+
+def _stratified_split_multihead(
+    x: np.ndarray,
+    y: np.ndarray,  # (N, num_diseases)
+    d: np.ndarray,
+    *,
+    val_frac: float,
+    seed: int,
+) -> tuple[
+    np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
+]:
+    """Stratify on (obesity-label, domain) cells — obesity is the most balanced,
+    directly-measured head, so it gives the most even val coverage. The full
+    per-disease label matrix is carried through the split unchanged.
+    """
+    rng = np.random.default_rng(seed)
+    strat = y[:, 0]
+    train_idx: list[int] = []
+    val_idx: list[int] = []
+    n_classes = int(strat.max()) + 1
+    n_domains = int(d.max()) + 1
+    for cls in range(n_classes):
+        for dom in range(n_domains):
+            idxs = np.where((strat == cls) & (d == dom))[0]
+            if len(idxs) == 0:
+                continue
+            rng.shuffle(idxs)
+            n_val = max(1, round(len(idxs) * val_frac)) if len(idxs) >= 2 else 0
+            val_idx.extend(idxs[:n_val].tolist())
+            train_idx.extend(idxs[n_val:].tolist())
+    tr = np.asarray(train_idx, dtype=np.int64)
+    va = np.asarray(val_idx, dtype=np.int64)
+    rng.shuffle(tr)
+    rng.shuffle(va)
+    return x[tr], y[tr], d[tr], x[va], y[va], d[va]
+
+
+def _per_disease_distribution(y: np.ndarray) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for i, disease in enumerate(DISEASES):
+        for cls_idx, cls in enumerate(RISK_CLASSES):
+            out[f"{disease.value}:{cls.value}"] = int((y[:, i] == cls_idx).sum())
+    return out
 
 
 def _stratified_split(
@@ -122,6 +195,119 @@ def _stratified_split(
     )
 
 
+def _run_multihead(args: argparse.Namespace, records: list[HarmonizedRecord], log) -> int:  # noqa: ANN001
+    """Train + export the per-disease multi-head DANN evidential model."""
+    chw_records = synthesize_chw_domain(
+        records, k_multiplier=args.chw_noise_multiplier, seed=args.seed
+    )
+    records = records + chw_records
+
+    x, y, d = _build_multihead_matrix(records)
+    per_disease_dist = _per_disease_distribution(y)
+    log.info(
+        "multihead_dataset_distribution",
+        total=len(records),
+        sources=source_distribution(records),
+        per_disease_labels=per_disease_dist,
+        domains={dm.value: n for dm, n in domain_distribution(records).items()},
+    )
+
+    x_train, y_train, d_train, x_val, y_val, d_val = _stratified_split_multihead(
+        x, y, d, val_frac=args.val_frac, seed=args.seed
+    )
+    log.info("split_sizes", train=len(x_train), val=len(x_val))
+
+    scaler = StandardScaler.fit(x_train)
+    x_train_s = scaler.transform(x_train)
+    x_val_s = scaler.transform(x_val)
+
+    hidden_dims = tuple(int(h) for h in args.hidden)
+    domain_labels = tuple(dm.value for dm in DOMAINS)
+    disease_labels = tuple(dz.value for dz in DISEASES)
+    output_path = args.output.resolve()
+    torch.manual_seed(args.seed)
+
+    model = build_multihead_dann_model(
+        input_dim=len(FEATURE_NAMES),
+        num_classes=len(RISK_CLASSES),
+        num_diseases=len(DISEASES),
+        num_domains=len(DOMAINS),
+        hidden_dims=hidden_dims,
+        domain_hidden=args.domain_hidden,
+        dropout=0.15,
+    )
+    final_metrics, history = train_multihead_dann_evidential_model(
+        model=model,
+        x_train=x_train_s,
+        y_train=y_train,
+        d_train=d_train,
+        x_val=x_val_s,
+        y_val=y_val,
+        d_val=d_val,
+        num_classes=len(RISK_CLASSES),
+        num_domains=len(DOMAINS),
+        num_diseases=len(DISEASES),
+        disease_labels=disease_labels,
+        domain_labels=domain_labels,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        lr=args.lr,
+        weight_decay=args.weight_decay,
+        annealing_epochs=args.annealing_epochs,
+        grl_gamma=args.grl_gamma,
+        class_balanced=args.class_balanced,
+        focal_gamma=args.focal_gamma,
+        seed=args.seed,
+    )
+
+    training_payload = {
+        "final": final_metrics.to_dict(),
+        "history": history,
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
+        "lr": args.lr,
+        "weight_decay": args.weight_decay,
+        "annealing_epochs": args.annealing_epochs,
+        "val_frac": args.val_frac,
+        "seed": args.seed,
+        "grl_gamma": args.grl_gamma,
+        "chw_noise_multiplier": args.chw_noise_multiplier,
+        "domain_hidden": args.domain_hidden,
+        "class_balanced": args.class_balanced,
+        "focal_gamma": args.focal_gamma,
+    }
+    save_checkpoint(
+        model=model,
+        checkpoint_path=output_path,
+        feature_names=FEATURE_NAMES,
+        label_mapping=tuple(c.value for c in RISK_CLASSES),
+        hidden_dims=hidden_dims,
+        scaler=scaler,
+        version=args.version,
+        training_metrics=training_payload,
+        source_distribution=source_distribution(records),
+        class_distribution=per_disease_dist,
+        architecture="dann_multihead_v1",
+        domain_mapping=domain_labels,
+        domain_hidden=args.domain_hidden,
+        domain_distribution={
+            dm.value: n for dm, n in domain_distribution(records).items()
+        },
+        disease_mapping=disease_labels,
+    )
+
+    summary = {
+        "checkpoint": str(output_path),
+        "meta": str(output_path.with_suffix(output_path.suffix + ".meta.json")),
+        "architecture": "dann_multihead_v1",
+        "metrics": final_metrics.to_dict(),
+        "n_train": len(x_train),
+        "n_val": len(x_val),
+    }
+    print(json.dumps(summary, indent=2, default=str))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Train the Pathway A EDL classifier.")
     parser.add_argument(
@@ -154,6 +340,14 @@ def main(argv: list[str] | None = None) -> int:
         "--enable-dann",
         action="store_true",
         help="Train the DANN-augmented architecture (dann_v1).",
+    )
+    parser.add_argument(
+        "--multihead",
+        action="store_true",
+        help="Train the per-disease multi-head DANN architecture "
+        "(dann_multihead_v1): one evidential head per disease over a shared, "
+        "domain-invariant trunk. Implies the DANN domain adversary + CHW "
+        "synthesis.",
     )
     parser.add_argument(
         "--chw-noise-multiplier",
@@ -203,6 +397,9 @@ def main(argv: list[str] | None = None) -> int:
     if not records:
         log.error("no_records_loaded", data_dir=str(args.data_dir))
         return 2
+
+    if args.multihead:
+        return _run_multihead(args, records, log)
 
     if args.enable_dann:
         chw_records = synthesize_chw_domain(

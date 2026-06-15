@@ -174,6 +174,32 @@ export const RISK_CLASSES: readonly RiskClass[] = [
   RiskClass.VERY_HIGH_RISK,
 ];
 
+/**
+ * The three NCDs Pathway A weights INDEPENDENTLY. Each disease carries its own
+ * Dirichlet over {@link RiskClass}, its own uncertainty decomposition and its
+ * own {@link TriageState}. There is no single global risk class — the overall
+ * state is the worst of the three (with safety overrides forcing RED).
+ */
+export const Disease = {
+  OBESITY: 'OBESITY',
+  HYPERTENSION: 'HYPERTENSION',
+  DIABETES: 'DIABETES',
+} as const;
+export type Disease = (typeof Disease)[keyof typeof Disease];
+export const DiseaseSchema = z.nativeEnum(Disease);
+/** Fixed order — mirrors the model's per-disease heads and the UI layout. */
+export const DISEASES: readonly Disease[] = [
+  Disease.OBESITY,
+  Disease.HYPERTENSION,
+  Disease.DIABETES,
+];
+/** Human-readable disease labels for the UI. */
+export const DISEASE_LABELS: Record<Disease, string> = {
+  [Disease.OBESITY]: 'Obesity',
+  [Disease.HYPERTENSION]: 'Hypertension',
+  [Disease.DIABETES]: 'Diabetes (proxy)',
+};
+
 /** EDL state-machine thresholds — single source of truth shared with the API. */
 export const EDL_THRESHOLDS = {
   /** u = K/S above this triggers YELLOW (too uncertain to act on). */
@@ -263,13 +289,26 @@ export const TriageUncertaintySchema = z.object({
 });
 export type TriageUncertainty = z.infer<typeof TriageUncertaintySchema>;
 
-export const TriageAssessmentResponseSchema = z.object({
-  id: z.string().uuid(),
+/** Independent evidential risk assessment for a single NCD. */
+export const PerDiseaseRiskSchema = z.object({
+  disease: DiseaseSchema,
   state: z.nativeEnum(TriageState),
   top_class: RiskClassSchema,
   class_probabilities: z.record(RiskClassSchema, z.number().min(0).max(1)),
   evidence: z.record(RiskClassSchema, z.number().min(0)),
   uncertainty: TriageUncertaintySchema,
+  /** Human-readable clinical drivers (e.g. "BMI ≥ 30", "Family history"). */
+  contributing_factors: z.array(z.string()),
+  next_action: z.string(),
+});
+export type PerDiseaseRisk = z.infer<typeof PerDiseaseRiskSchema>;
+
+export const TriageAssessmentResponseSchema = z.object({
+  id: z.string().uuid(),
+  /** Worst of the per-disease states; RED whenever a safety override fires. */
+  overall_state: z.nativeEnum(TriageState),
+  /** One entry per disease in {@link DISEASES}, each independently weighted. */
+  per_disease: z.array(PerDiseaseRiskSchema),
   derived_features: z.object({
     bmi: z.number().nullable(),
     whtr: z.number().nullable(),
@@ -279,7 +318,7 @@ export const TriageAssessmentResponseSchema = z.object({
   plausibility_flags: z.array(z.nativeEnum(PlausibilityFlag)),
   safety_override_triggered: z.boolean(),
   override_reasons: z.array(z.enum(SAFETY_OVERRIDE_SYMPTOM_KEYS)),
-  /** "trained_torch_v1" once a checkpoint ships; "rule_based_fallback_v1" otherwise. */
+  /** "trained_torch_dann_multihead_v1" once a checkpoint ships; "rule_based_fallback_v1" otherwise. */
   model_kind: z.string(),
   next_action: z.string(),
   created_at: z.string(),

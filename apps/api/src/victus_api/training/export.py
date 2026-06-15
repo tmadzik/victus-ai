@@ -35,14 +35,23 @@ def save_checkpoint(
     domain_mapping: tuple[str, ...] | None = None,
     domain_hidden: int | None = None,
     domain_distribution: dict[str, int] | None = None,
+    disease_mapping: tuple[str, ...] | None = None,
 ) -> None:
     """Write the state_dict + a JSON meta sidecar.
 
-    ``architecture`` discriminates between ``sequential_v1`` (flat
-    ``nn.Sequential``) and ``dann_v1`` (shared extractor + task head + GRL +
-    domain head). The runtime ``EvidentialTorchModel`` dispatches on this
-    field to reconstruct the correct module before ``load_state_dict``.
+    ``architecture`` discriminates between the supported topologies:
+
+    * ``sequential_v1`` / ``dann_v1`` — single risk head (legacy).
+    * ``sequential_multihead_v1`` / ``dann_multihead_v1`` — one evidential head
+      per disease; the sidecar pins ``disease_mapping`` (head order) so the
+      runtime reconstructs the correct number of heads.
+
+    The runtime ``EvidentialTorchModel`` dispatches on this field to rebuild the
+    correct module before ``load_state_dict``.
     """
+    dann_architectures = {"dann_v1", "dann_multihead_v1"}
+    multihead_architectures = {"sequential_multihead_v1", "dann_multihead_v1"}
+
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), checkpoint_path)
 
@@ -58,15 +67,21 @@ def save_checkpoint(
         "source_distribution": source_distribution,
         "class_distribution": class_distribution,
     }
-    if architecture == "dann_v1":
+    if architecture in dann_architectures:
         if domain_mapping is None or domain_hidden is None:
             raise ValueError(
-                "dann_v1 checkpoints require domain_mapping and domain_hidden",
+                f"{architecture} checkpoints require domain_mapping and domain_hidden",
             )
         meta["domain_mapping"] = list(domain_mapping)
         meta["domain_hidden"] = int(domain_hidden)
         if domain_distribution is not None:
             meta["domain_distribution"] = domain_distribution
+    if architecture in multihead_architectures:
+        if disease_mapping is None:
+            raise ValueError(
+                f"{architecture} checkpoints require disease_mapping",
+            )
+        meta["disease_mapping"] = list(disease_mapping)
 
     meta_path = checkpoint_path.with_suffix(checkpoint_path.suffix + ".meta.json")
     meta_path.write_text(json.dumps(meta, indent=2, sort_keys=True) + "\n")

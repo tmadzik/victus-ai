@@ -37,6 +37,27 @@ IMPLAUSIBLE_INPUTS: dict[str, Any] = {
     "diastolic_bp_mmhg": 95.0,
 }
 
+# Severely obese with an unambiguously NORMAL blood pressure — exercises
+# independent per-disease weighting (obesity must be elevated while
+# hypertension stays no worse than obesity).
+OBESE_NORMAL_BP_INPUTS: dict[str, Any] = {
+    "height_cm": 170.0,
+    "weight_kg": 112.0,
+    "waist_cm": 120.0,
+    "hip_cm": 120.0,
+    "age_years": 50,
+    "sex": "MALE",
+    "systolic_bp_mmhg": 116.0,
+    "diastolic_bp_mmhg": 74.0,
+}
+
+_DISEASES = ("OBESITY", "HYPERTENSION", "DIABETES")
+_STATE_SEVERITY = {"GREEN": 0, "YELLOW": 1, "RED": 2}
+
+
+def _by_disease(result: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {entry["disease"]: entry for entry in result["per_disease"]}
+
 
 @pytest.fixture
 def patient(client: Any) -> dict[str, Any]:
@@ -91,24 +112,64 @@ def test_edl_normal_assessment(client: Any, patient: dict[str, Any]) -> None:
     result = _assess(client, patient["headers"], NORMAL_INPUTS, [])
 
     assert result["safety_override_triggered"] is False
-    assert result["state"] in {"GREEN", "YELLOW", "RED"}
+    assert result["overall_state"] in {"GREEN", "YELLOW", "RED"}
 
-    probs = result["class_probabilities"]
-    assert abs(sum(probs.values()) - 1.0) < 1e-3, "Dirichlet mean must be a distribution"
+    # Every disease is weighted independently — one entry per NCD, each a
+    # well-formed Dirichlet with its own uncertainty decomposition and state.
+    by_disease = _by_disease(result)
+    assert set(by_disease) == set(_DISEASES)
+    for disease, entry in by_disease.items():
+        assert entry["state"] in {"GREEN", "YELLOW", "RED"}, disease
+        probs = entry["class_probabilities"]
+        assert abs(sum(probs.values()) - 1.0) < 1e-3, f"{disease} mean must be a distribution"
+        unc = entry["uncertainty"]
+        assert 0.0 <= unc["vacuity"] <= 1.0
+        assert unc["epistemic"] >= 0.0 and unc["aleatoric"] >= 0.0
 
-    unc = result["uncertainty"]
-    assert 0.0 <= unc["vacuity"] <= 1.0
-    assert unc["epistemic"] >= 0.0 and unc["aleatoric"] >= 0.0
+    # The overall state is exactly the worst of the per-disease states.
+    worst = max(_STATE_SEVERITY[e["state"]] for e in result["per_disease"])
+    assert _STATE_SEVERITY[result["overall_state"]] == worst
+
+
+@pytest.mark.usefixtures("require_triage_model")
+def test_per_disease_independent_weighting(client: Any, patient: dict[str, Any]) -> None:
+    """A severely obese subject with a normal cuff reading must NOT let obesity
+    drag hypertension up — the diseases are scored independently."""
+    result = _assess(client, patient["headers"], OBESE_NORMAL_BP_INPUTS, [])
+    by_disease = _by_disease(result)
+
+    obesity = by_disease["OBESITY"]
+    hypertension = by_disease["HYPERTENSION"]
+
+    # Obesity is clearly elevated from BMI ~38.8 / WHtR ~0.71.
+    assert obesity["top_class"] in {"HIGH_RISK", "VERY_HIGH_RISK"}
+    assert obesity["state"] in {"YELLOW", "RED"}
+    # The adiposity signal must NOT bleed into hypertension: with a normal cuff
+    # reading, hypertension is never escalated to RED and stays no worse than
+    # the obesity head.
+    assert hypertension["state"] != "RED"
+    assert (
+        _STATE_SEVERITY[hypertension["state"]] <= _STATE_SEVERITY[obesity["state"]]
+    )
+    # The overall state tracks the worst disease (obesity or the diabetes proxy).
+    worst = max(_STATE_SEVERITY[e["state"]] for e in result["per_disease"])
+    assert _STATE_SEVERITY[result["overall_state"]] == worst
 
 
 def test_safety_override_forces_red(client: Any, patient: dict[str, Any]) -> None:
-    """A red-flag symptom short-circuits to RED before the model is consulted —
-    so this holds even without the EDL checkpoint present."""
+    """A red-flag symptom forces overall RED and routes the implicated disease
+    to RED — deterministic, so it holds even without the EDL checkpoint."""
     result = _assess(client, patient["headers"], NORMAL_INPUTS, ["chest_pain_radiating"])
 
     assert result["safety_override_triggered"] is True
-    assert result["state"] == "RED"
+    assert result["overall_state"] == "RED"
     assert "chest_pain_radiating" in result["override_reasons"]
+
+    # chest_pain_radiating is routed to HYPERTENSION → that disease is RED with
+    # the red-flag surfaced as a contributing factor.
+    hypertension = _by_disease(result)["HYPERTENSION"]
+    assert hypertension["state"] == "RED"
+    assert any("chest pain" in f.lower() for f in hypertension["contributing_factors"])
 
 
 @pytest.mark.usefixtures("require_triage_model")

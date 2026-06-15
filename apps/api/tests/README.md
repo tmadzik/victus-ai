@@ -34,12 +34,13 @@ container, so the same tests run unchanged.
 
 | Suite | What it locks in |
 |-------|------------------|
-| `test_pathway_a.py` | register / login / **JWT refresh rotation**, consent gating, EDL risk assessment (Dirichlet distribution + uncertainty bounds), **deterministic safety override → RED**, input-plausibility flags, history persistence |
+| `test_pathway_a.py` | register / login / **JWT refresh rotation**, consent gating, **per-disease EDL risk assessment** (one Dirichlet + uncertainty per NCD, `overall_state` = worst of three, independent weighting), **deterministic safety override → RED with disease routing**, input-plausibility flags, history persistence |
 | `test_pathway_b.py` | rPPG/TOI heart-rate recovery from a synthetic capture, study subject/session lifecycle, **6-pair calibration Bland-Altman** agreement, governance **maker-checker** erasure (segregation of duties, erased account can't authenticate), notification read lifecycle |
 
-The EDL assertions skip automatically (`require_triage_model` fixture) if the
-shipped checkpoint `models/triage_edl_v1_demo.pt` is absent; the safety-override
-path runs regardless, since it short-circuits before the model is consulted.
+The EDL assertions skip automatically (`require_triage_model` fixture) if no
+trained checkpoint is present (`models/triage_edl_multihead_v1.pt`, falling back
+to `models/triage_edl_v1_demo.pt`); the safety-override and per-disease-shape
+paths run regardless against the rule-based per-disease backend.
 
 ## Markers
 

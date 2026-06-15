@@ -241,6 +241,126 @@ def build_dann_evidential_model(
     return DANNEvidentialModel()
 
 
+# ---------------------------------------------------------------------------
+# Multi-head (per-disease) architectures
+# ---------------------------------------------------------------------------
+
+
+def build_multihead_mlp(
+    input_dim: int,
+    num_classes: int,
+    num_diseases: int,
+    hidden_dims: tuple[int, ...] = (64, 32),
+    dropout: float = 0.1,
+) -> nn.Module:
+    """Shared MLP trunk + one evidential (Softplus) head per disease.
+
+    Architecture identifier: ``sequential_multihead_v1``. Each head produces an
+    independent ``num_classes``-wide evidence vector, so obesity, hypertension
+    and diabetes get their own Dirichlet over the same shared representation.
+
+    ``forward(x) -> list[Tensor]`` of length ``num_diseases``, each
+    ``(B, num_classes)``.
+    """
+    from torch import nn
+
+    class MultiHeadEvidentialMLP(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            fx_layers: list[nn.Module] = []
+            prev = input_dim
+            for h in hidden_dims:
+                fx_layers.append(nn.Linear(prev, h))
+                fx_layers.append(nn.GELU())
+                fx_layers.append(nn.Dropout(p=max(dropout, 0.0)))
+                prev = h
+            self.feature_extractor = nn.Sequential(*fx_layers)
+            feature_dim = hidden_dims[-1]
+            self.task_heads = nn.ModuleList(
+                nn.Sequential(
+                    nn.Linear(feature_dim, num_classes),
+                    nn.Softplus(beta=1.0),
+                )
+                for _ in range(num_diseases)
+            )
+
+        def forward(self, x: torch.Tensor) -> list[torch.Tensor]:
+            features = self.feature_extractor(x)
+            return [head(features) for head in self.task_heads]
+
+    return MultiHeadEvidentialMLP()
+
+
+def build_multihead_dann_model(
+    input_dim: int,
+    num_classes: int,
+    num_diseases: int,
+    num_domains: int,
+    hidden_dims: tuple[int, ...] = (64, 32),
+    domain_hidden: int = 32,
+    dropout: float = 0.15,
+) -> nn.Module:
+    """DANN-augmented multi-head Evidential model.
+
+    Architecture identifier: ``dann_multihead_v1``. Topology::
+
+        x → [shared feature extractor]
+             ├─→ [task head_obesity]      → evidence (Dirichlet)
+             ├─→ [task head_hypertension] → evidence (Dirichlet)
+             ├─→ [task head_diabetes]     → evidence (Dirichlet)
+             └─→ [GRL(λ)] → [domain head] → domain logits
+
+    A single gradient-reversed domain head keeps the shared representation
+    invariant across measurement provenance, while each disease specialises in
+    its own evidential head. Inference skips the domain head via
+    ``predict_evidence``.
+
+    ``forward(x, grl_alpha) -> (list[Tensor], Tensor)`` — per-disease evidence
+    and domain logits. ``predict_evidence(x) -> list[Tensor]``.
+    """
+    from torch import nn
+
+    class MultiHeadDANNModel(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            fx_layers: list[nn.Module] = []
+            prev = input_dim
+            for h in hidden_dims:
+                fx_layers.append(nn.Linear(prev, h))
+                fx_layers.append(nn.GELU())
+                fx_layers.append(nn.Dropout(p=max(dropout, 0.0)))
+                prev = h
+            self.feature_extractor = nn.Sequential(*fx_layers)
+            feature_dim = hidden_dims[-1]
+            self.task_heads = nn.ModuleList(
+                nn.Sequential(
+                    nn.Linear(feature_dim, num_classes),
+                    nn.Softplus(beta=1.0),
+                )
+                for _ in range(num_diseases)
+            )
+            self.domain_head = nn.Sequential(
+                nn.Linear(feature_dim, domain_hidden),
+                nn.GELU(),
+                nn.Linear(domain_hidden, num_domains),
+            )
+
+        def forward(
+            self, x: torch.Tensor, grl_alpha: float = 1.0
+        ) -> tuple[list[torch.Tensor], torch.Tensor]:
+            features = self.feature_extractor(x)
+            evidence = [head(features) for head in self.task_heads]
+            domain_logits = self.domain_head(grad_reverse(features, grl_alpha))
+            return evidence, domain_logits
+
+        def predict_evidence(self, x: torch.Tensor) -> list[torch.Tensor]:
+            """Inference path — domain head is not consulted."""
+            features = self.feature_extractor(x)
+            return [head(features) for head in self.task_heads]
+
+    return MultiHeadDANNModel()
+
+
 def edl_mse_loss(
     evidence: Tensor,
     target_one_hot: Tensor,
