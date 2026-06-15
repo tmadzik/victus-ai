@@ -10,6 +10,37 @@ it.
 > form is a server action, so a plain static-file docroot is **not** enough —
 > the Node.js application feature is required.
 
+## Domain topology (one-time)
+
+Two hostnames, two independent deployments:
+
+| Hostname                | Serves                     | Lives where                                               |
+| ----------------------- | -------------------------- | --------------------------------------------------------- |
+| `www.victusdata.com`    | This marketing site        | cPanel Node.js app (this guide)                           |
+| `victusdata.com` (apex) | 301 redirect → `www`       | cPanel redirect (SEO — the site's canonical URL is `www`) |
+| `app.victusdata.com`    | The Victus AI clinical app | Separate deployment from the app repo — **reserve only**  |
+
+The marketing site's canonical origin is `https://www.victusdata.com` (set in
+`src/lib/site.ts`), so apex traffic must funnel to `www` to avoid duplicate-URL
+SEO penalties.
+
+**Set this up before deploying:**
+
+1. **`www` for the marketing app** — handled in step 2 below (the Node.js app's
+   _Application URL_ is `www.victusdata.com`). If `www` isn't already a
+   subdomain, create it under cPanel → **Domains** first.
+2. **Apex → www redirect** — cPanel → **Domains** → **Redirects**: permanent
+   (301) redirect from `victusdata.com` to `https://www.victusdata.com`.
+3. **`app` subdomain** — cPanel → **Domains** → **Create A New Domain** →
+   `app.victusdata.com`. The clinical app is deployed from its own repository,
+   so for now just reserve the subdomain (point it at a placeholder docroot or
+   a "coming soon" page). The marketing **Sign In** button already links to
+   `https://app.victusdata.com/login` via the build-time `NEXT_PUBLIC_APP_URL`.
+
+> Auth cookies are scoped strictly to `app.victusdata.com` — never set a
+> cookie on the parent `.victusdata.com` domain, or the marketing site would
+> start carrying session state it must not have.
+
 ## 1. Build the bundle (local machine or CI)
 
 ```bash
