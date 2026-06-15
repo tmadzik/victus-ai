@@ -1,9 +1,4 @@
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-export function cn(...inputs: ClassValue[]): string {
-  return twMerge(clsx(inputs));
-}
+export { cn } from '@victus/ui';
 
 export function formatDate(value: string | Date): string {
   const date = value instanceof Date ? value : new Date(value);

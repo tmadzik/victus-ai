@@ -1,0 +1,14 @@
+@import 'tailwindcss';
+
+/* Victus unified design tokens + base layer — owned by @victus/ui so the
+   marketing site and the clinical app cannot drift apart. */
+@import '@victus/ui/styles.css';
+
+/* Tailwind must scan the shared component sources for class names. */
+@source '../../../../packages/ui/src';
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+}
