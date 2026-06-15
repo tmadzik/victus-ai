@@ -27,16 +27,29 @@ export const publicEnv = publicEnvSchema.parse({
   NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
 });
 
+// When packaging the cPanel bundle we run `next build` with no server secrets
+// (they live in the cPanel Node.js app screen, set at runtime). This escape
+// hatch lets the build's page-data collection pass without them. It is NOT set
+// when the standalone server actually starts, so real runtime requests are
+// still validated strictly below.
+const skipServerEnvValidation =
+  process.env.SKIP_ENV_VALIDATION === '1' || process.env.SKIP_ENV_VALIDATION === 'true';
+
 function loadServerEnv(): z.infer<typeof serverEnvSchema> {
   if (typeof window !== 'undefined') {
     throw new Error('serverEnv must not be read in the browser');
   }
   return serverEnvSchema.parse({
-    AUTH_SECRET: process.env.AUTH_SECRET,
+    AUTH_SECRET:
+      process.env.AUTH_SECRET ?? (skipServerEnvValidation ? 'x'.repeat(32) : undefined),
     AUTH_URL: process.env.AUTH_URL,
     AUTH_TRUST_HOST: process.env.AUTH_TRUST_HOST,
-    INTERNAL_API_BASE_URL: process.env.INTERNAL_API_BASE_URL,
-    INTERNAL_SERVICE_TOKEN: process.env.INTERNAL_SERVICE_TOKEN,
+    INTERNAL_API_BASE_URL:
+      process.env.INTERNAL_API_BASE_URL ??
+      (skipServerEnvValidation ? 'http://localhost' : undefined),
+    INTERNAL_SERVICE_TOKEN:
+      process.env.INTERNAL_SERVICE_TOKEN ??
+      (skipServerEnvValidation ? 'x'.repeat(16) : undefined),
   });
 }
 
