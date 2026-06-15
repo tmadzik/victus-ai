@@ -62,6 +62,20 @@ PORT=3001 node apps/marketing/.next/standalone/app.js
 # → http://localhost:3001
 ```
 
+**Prefer CI for the production artifact.** The
+`.github/workflows/release-marketing.yml` workflow builds the zip on Linux
+(matching the cPanel host), so you never hand-build on macOS:
+
+- **Publish a GitHub Release** → the bundle is built and attached to that
+  release as `victus-marketing-cpanel-<tag>.zip`. Download it and skip to
+  step 2.
+- **Actions → "Release — marketing cPanel bundle" → Run workflow** → builds and
+  uploads the zip as a downloadable workflow artifact (no release needed).
+
+The workflow bakes in `NEXT_PUBLIC_APP_URL` from the repo variable of the same
+name (default `https://app.victusdata.com`), or the value you type when running
+it manually.
+
 ## 2. Create the Node.js app in cPanel
 
 1. cPanel → **Setup Node.js App** → **Create Application**

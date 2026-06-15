@@ -1,0 +1,69 @@
+name: Release — marketing cPanel bundle
+
+# Builds the self-contained marketing site bundle on Linux (matching the cPanel
+# host architecture) so it never has to be hand-built on a developer machine.
+#
+# - On a published GitHub Release: build and attach the zip to that release.
+# - On manual dispatch: build and upload the zip as a workflow artifact you can
+#   download from the run (no release needed).
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: 'NEXT_PUBLIC_APP_URL to bake in (Sign In target)'
+        required: false
+        default: 'https://app.victusdata.com'
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    name: Build marketing cPanel bundle (Linux x86-64)
+    runs-on: ubuntu-latest
+    env:
+      # Inlined into the build. Release builds use the production app URL; a
+      # repo variable can override it, and manual runs take the dispatch input.
+      NEXT_PUBLIC_APP_URL: >-
+        ${{ inputs.app_url || vars.NEXT_PUBLIC_APP_URL || 'https://app.victusdata.com' }}
+      NEXT_TELEMETRY_DISABLED: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable corepack (pins pnpm from packageManager)
+        run: corepack enable
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build cPanel bundle
+        run: pnpm --filter @victus/marketing build:cpanel
+
+      - name: Name the artifact
+        id: artifact
+        run: |
+          ref="${{ github.event.release.tag_name || github.sha }}"
+          name="victus-marketing-cpanel-${ref}.zip"
+          cp apps/marketing/dist-cpanel/victus-marketing-cpanel.zip "$name"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketing-cpanel-bundle
+          path: ${{ steps.artifact.outputs.name }}
+          if-no-files-found: error
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" "${{ steps.artifact.outputs.name }}" --clobber
