@@ -7,7 +7,7 @@ import { APP_URL } from '@/lib/site';
 const NAV_LINKS = [
   { href: '#platform', label: 'Platform' },
   { href: '#physical-network', label: 'Physical Network' },
-  { href: '#clinical-approach', label: 'Clinical Approach' },
+  { href: '#clinical-approach', label: 'NCD Risk Approach' },
 ] as const;
 
 export function SiteHeader(): ReactElement {
