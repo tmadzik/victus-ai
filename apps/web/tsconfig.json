@@ -12,7 +12,8 @@
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./src/*"],
-      "@victus/contracts": ["../../packages/contracts/src"]
+      "@victus/contracts": ["../../packages/contracts/src"],
+      "@victus/ui": ["../../packages/ui/src"]
     }
   },
   "include": [
@@ -20,7 +21,9 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    "../../packages/contracts/src/**/*.ts"
+    "../../packages/contracts/src/**/*.ts",
+    "../../packages/ui/src/**/*.ts",
+    "../../packages/ui/src/**/*.tsx"
   ],
   "exclude": ["node_modules", ".next"]
 }

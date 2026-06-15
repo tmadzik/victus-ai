@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '2mb',
     },
   },
-  transpilePackages: ['@victus/contracts'],
+  transpilePackages: ['@victus/contracts', '@victus/ui'],
   async headers() {
     const securityHeaders = [
       { key: 'X-DNS-Prefetch-Control', value: 'on' },
