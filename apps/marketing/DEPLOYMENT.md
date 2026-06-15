@@ -33,9 +33,12 @@ SEO penalties.
    (301) redirect from `victusdata.com` to `https://www.victusdata.com`.
 3. **`app` subdomain** — cPanel → **Domains** → **Create A New Domain** →
    `app.victusdata.com`. The clinical app is deployed from its own repository,
-   so for now just reserve the subdomain (point it at a placeholder docroot or
-   a "coming soon" page). The marketing **Sign In** button already links to
-   `https://app.victusdata.com/login` via the build-time `NEXT_PUBLIC_APP_URL`.
+   so for now park the subdomain with the bundled placeholder: upload
+   `apps/marketing/parking/index.html` to the subdomain's document root (it's a
+   single self-contained "coming soon" file — no build step, no dependencies).
+   The marketing **Sign In** button already links to
+   `https://app.victusdata.com/login` via the build-time `NEXT_PUBLIC_APP_URL`;
+   it will start working once the real app is deployed over the placeholder.
 
 > Auth cookies are scoped strictly to `app.victusdata.com` — never set a
 > cookie on the parent `.victusdata.com` domain, or the marketing site would
