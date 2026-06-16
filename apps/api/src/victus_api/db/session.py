@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.pool import NullPool
 
 from victus_api.config import Settings, get_settings
 from victus_api.core.logging import get_logger
@@ -86,6 +87,16 @@ def _spawn_post_commit(callbacks: list[PostCommitCallback]) -> None:
 
 
 def make_engine(settings: Settings) -> AsyncEngine:
+    if settings.db_disable_pool:
+        # WSGI/Passenger (cPanel) path: a fresh connection per request, so no
+        # asyncpg connection outlives the per-request event loop. NullPool does
+        # not take pool sizing/recycle options.
+        return create_async_engine(
+            settings.database_url,
+            echo=False,
+            poolclass=NullPool,
+            future=True,
+        )
     return create_async_engine(
         settings.database_url,
         echo=False,

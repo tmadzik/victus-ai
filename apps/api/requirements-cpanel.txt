@@ -1,0 +1,32 @@
+# Runtime dependencies for the cPanel "Setup Python App" deployment.
+#
+# Mirrors the [project].dependencies in pyproject.toml, plus a2wsgi (the
+# ASGI->WSGI bridge Passenger needs). Installed ON the Linux host via the app's
+# virtualenv ("Run Pip Install" or `pip install -r requirements-cpanel.txt`), so
+# native wheels (numpy, scipy, asyncpg, psycopg, argon2) match the host platform.
+#
+# The torch-based `ml` extra is intentionally OMITTED: it is ~hundreds of MB and
+# usually exceeds shared-hosting limits. Without it the API serves the
+# clinically-grounded rule-based per-disease backend (identical response shape).
+# To run the trained multi-head checkpoint instead, install `torch` + set
+# VICTUS_TRIAGE_MODEL_PATH — feasible only on a host with the resources for it.
+
+fastapi>=0.115.5
+uvicorn[standard]>=0.32.1
+pydantic>=2.10.2
+pydantic-settings>=2.6.1
+sqlalchemy[asyncio]>=2.0.36
+asyncpg>=0.30.0
+psycopg[binary]>=3.2.3
+alembic>=1.14.0
+argon2-cffi>=23.1.0
+pyjwt>=2.10.1
+python-multipart>=0.0.19
+email-validator>=2.2.0
+structlog>=24.4.0
+slowapi>=0.1.9
+httpx>=0.28.0
+orjson>=3.10.12
+numpy>=2.1.3
+scipy>=1.14.1
+a2wsgi>=1.10.0
