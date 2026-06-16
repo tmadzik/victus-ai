@@ -46,6 +46,17 @@ class Settings(BaseSettings):
         default="postgresql+psycopg://victus:victus_dev_only_change_me@localhost:5432/victus",
         description="Sync DSN for Alembic.",
     )
+    db_disable_pool: bool = Field(
+        default=False,
+        description=(
+            "Use SQLAlchemy NullPool (a fresh connection per request) instead of "
+            "a persistent connection pool. Set this on WSGI/Passenger hosts "
+            "(cPanel 'Setup Python App'), where an ASGI adapter runs each request "
+            "on a new event loop — a pooled asyncpg connection would be bound to "
+            "a stale loop and raise 'attached to a different loop'. Leave off for "
+            "uvicorn/VPS deployments, which keep one loop and benefit from pooling."
+        ),
+    )
 
     jwt_secret_key: SecretStr = Field(
         default=SecretStr("dev_jwt_secret_replace_with_openssl_rand_hex_32_xxxxxxxxxxxxxxxx"),
