@@ -2,7 +2,7 @@
 
 The marketing site ships as a **self-contained Node.js bundle** (Next.js
 standalone output, production `node_modules` included). The cPanel host never
-runs `npm install` — you build locally, upload one zip, and point Passenger at
+runs `npm install` — you build locally, upload one archive, and point Passenger at
 it.
 
 > **Host requirements:** cPanel with **"Setup Node.js App"** (CloudLinux
@@ -59,7 +59,12 @@ NEXT_PUBLIC_APP_URL=https://app.victusdata.com \
   pnpm --filter @victus/marketing build:cpanel
 ```
 
-Output: `apps/marketing/dist-cpanel/victus-marketing-cpanel.zip`
+Output: `apps/marketing/dist-cpanel/victus-marketing-cpanel.tar.gz`
+
+> Shipped as `.tar.gz`, not `.zip`: cPanel's malware scanner (ClamAV +
+> Sanesecurity "Foxhole") false-positives on any zip containing JavaScript
+> (`Foxhole.JS_Zip_*`), which a Node bundle always trips. A tarball avoids it
+> and cPanel extracts it identically.
 
 The same bundle also runs locally for a final smoke test:
 
@@ -74,9 +79,9 @@ PORT=3001 node apps/marketing/.next/standalone/app.js
 > cPanel. Building on Node 20 keeps the build major aligned with the host.
 
 > **Optional CI fallback.** A dormant `.github/workflows/release-marketing.yml`
-> can build the same zip on Linux (on a published Release, or via **Actions →
-> Run workflow**) if you ever want to build off-machine. It is not required for
-> this deploy flow.
+> can build the same tarball on Linux (on a published Release, or via
+> **Actions → Run workflow**) if you ever want to build off-machine. It is not
+> required for this deploy flow.
 
 ## 2. Create the Node.js app in cPanel
 
@@ -94,9 +99,11 @@ PORT=3001 node apps/marketing/.next/standalone/app.js
 
 1. cPanel → **File Manager** → navigate to the application root
    (`~/victus-marketing`).
-2. Upload `victus-marketing-cpanel.zip` and **Extract** it there. The folder
-   should now contain `app.js`, `apps/`, and `node_modules/` at the top level.
-3. Delete the zip after extraction.
+2. Upload `victus-marketing-cpanel.tar.gz` and **Extract** it there (cPanel
+   File Manager extracts `.tar.gz` natively; or over SSH:
+   `tar -xzf victus-marketing-cpanel.tar.gz`). The folder should now contain
+   `app.js`, `apps/`, and `node_modules/` at the top level.
+3. Delete the archive after extraction.
 
 Do **not** run "Run NPM Install" in the Node.js app screen — dependencies are
 already bundled.
@@ -136,7 +143,7 @@ the Node.js app screen / Passenger log).
 ## Updating the site
 
 Re-run step 1, stop the app, delete the old `apps/` and `node_modules/`
-folders, extract the new zip, start the app. Environment variables persist
+folders, extract the new archive, start the app. Environment variables persist
 across updates.
 
 ## Troubleshooting
@@ -146,7 +153,11 @@ across updates.
 - **Form succeeds but no email arrives** — check the Passenger log for
   `[pilot-request] channel failure(s)`. Usual causes: wrong mailbox password,
   or the host requires port 587 with `SMTP_SECURE=false`.
-- **Styles load but images 404** — the zip was extracted into a subfolder;
+- **Styles load but images 404** — the archive was extracted into a subfolder;
   `app.js` must sit directly in the application root.
 - **"Sign In" points to the wrong place** — `NEXT_PUBLIC_APP_URL` is baked in
   at build time; rebuild the bundle with the correct value.
+- **Upload blocked: `Sanesecurity.Foxhole.JS_Zip_*` "virus"** — a false
+  positive from cPanel's scanner on zips containing JavaScript. Use the
+  `.tar.gz` artifact (the default) instead of a `.zip`; if you still have a
+  zip, re-run `pnpm build:cpanel` to produce the tarball, or upload over SSH.
