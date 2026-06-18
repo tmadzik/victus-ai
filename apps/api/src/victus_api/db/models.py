@@ -904,3 +904,168 @@ class Notification(Base):
             "created_at",
         ),
     )
+
+
+class JobStatus(str, enum.Enum):
+    """Lifecycle of an inbound capture (e.g. a WhatsApp video) being processed.
+
+    QUEUED      -> claimed by a worker -> PROCESSING
+    PROCESSING  -> SUCCEEDED (vitals returned)
+                -> REJECTED  (capture unusable; user asked to re-record — a
+                              normal outcome, not an error)
+                -> QUEUED    (transient failure, re-queued with backoff)
+                -> FAILED    (max attempts exhausted)
+    """
+
+    QUEUED = "QUEUED"
+    PROCESSING = "PROCESSING"
+    SUCCEEDED = "SUCCEEDED"
+    REJECTED = "REJECTED"
+    FAILED = "FAILED"
+
+
+class ProcessingJob(Base):
+    """A unit of asynchronous capture processing for the WhatsApp/kiosk rail.
+
+    The webhook writes a QUEUED row and returns 200 immediately; a background
+    worker (cPanel cron or persistent Python app) claims it with
+    ``FOR UPDATE SKIP LOCKED``, downloads the media, runs the rPPG extractor +
+    pipeline, replies, and records the terminal status. Keeping the queue in the
+    primary database means no Redis/Celery dependency on shared hosting.
+    """
+
+    __tablename__ = "processing_jobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=func.gen_random_uuid(),
+    )
+    status: Mapped[JobStatus] = mapped_column(
+        SAEnum(JobStatus, name="job_status", native_enum=True),
+        nullable=False,
+        server_default=JobStatus.QUEUED.value,
+    )
+    channel: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="WHATSAPP"
+    )
+    # Sender phone (E.164). For the demo we store it directly; production should
+    # store a salted hash and keep the cleartext only in the session store.
+    wa_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Inbound WhatsApp message id — used for idempotency (Meta re-delivers).
+    wa_message_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # WhatsApp media id to download, and the local temp path once fetched.
+    media_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    media_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    language: Mapped[str] = mapped_column(
+        String(8), nullable=False, server_default="en"
+    )
+    # Optional participant user the result is persisted against (set by the
+    # webhook once a phone number is mapped to a participant). Null in tests.
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    # Collected demographic + symptom intake (for later NCD-3B triage compose).
+    intake: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default="{}"
+    )
+    attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
+    max_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="3"
+    )
+    next_attempt_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    locked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    error: Mapped[str | None] = mapped_column(String(4000), nullable=True)
+    result: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default="{}"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+    processed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        # Drives the claim query: oldest eligible QUEUED job first.
+        Index(
+            "ix_processing_jobs_status_next_attempt",
+            "status",
+            "next_attempt_at",
+            "created_at",
+        ),
+        Index("ix_processing_jobs_wa_message_id", "wa_message_id"),
+        CheckConstraint(
+            "attempts >= 0 AND attempts <= max_attempts + 1",
+            name="ck_processing_jobs_attempts_bounded",
+        ),
+    )
+
+
+class WhatsAppSession(Base):
+    """Per-phone conversation state for the WhatsApp check-up flow.
+
+    One row per sender, keyed on the E.164 phone number. ``state`` stores the
+    ``ConvState`` value as text (conversation steps evolve faster than is worth a
+    native enum + migration each time). ``last_message_id`` deduplicates Meta's
+    at-least-once webhook re-delivery.
+    """
+
+    __tablename__ = "whatsapp_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=func.gen_random_uuid(),
+    )
+    phone: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
+    state: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="LANGUAGE"
+    )
+    language: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    consent: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    intake: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default="{}"
+    )
+    audit_index: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
+    safety_triggers: Mapped[list[str]] = mapped_column(
+        ARRAY(String(64)), nullable=False, default=list, server_default="{}"
+    )
+    contextual: Mapped[list[str]] = mapped_column(
+        ARRAY(String(64)), nullable=False, default=list, server_default="{}"
+    )
+    # Last processed inbound message id — webhook idempotency.
+    last_message_id: Mapped[str | None] = mapped_column(
+        String(128), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    __table_args__ = (
+        Index("ix_whatsapp_sessions_phone", "phone", unique=True),
+    )
