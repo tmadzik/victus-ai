@@ -1,5 +1,9 @@
 # Deploying the Victus API
 
+> The WhatsApp capture **worker** is a separate process with its own guide —
+> see [WORKER_DEPLOYMENT.md](WORKER_DEPLOYMENT.md). This doc covers the API
+> (which includes the WhatsApp webhook).
+
 The API is a **FastAPI (async ASGI) app backed by PostgreSQL**. That makes it the
 hardest of the three deployables — it needs a real Postgres database and a way to
 run a Python web process. Two supported paths:
