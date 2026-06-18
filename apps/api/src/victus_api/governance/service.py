@@ -26,6 +26,7 @@ from victus_api.db.models import (
     ToiAssessment,
     TriageAssessment,
     User,
+    WhatsAppSession,
 )
 from victus_api.db.models import (
     ErasureBasis as DbErasureBasis,
@@ -256,8 +257,14 @@ async def _execute_account_erasure(
     )
 
     # Bring the WhatsApp rail under erasure: scrub PII from any processing jobs
-    # linked to this account (phone, media, intake, derived vitals).
+    # linked to this account (phone, media, intake, derived vitals) and delete
+    # the linked conversation session(s), which hold the phone number.
     jobs_scrubbed = await scrub_user(db, target_user.id)
+    sessions_deleted = (
+        await db.execute(
+            delete(WhatsAppSession).where(WhatsAppSession.user_id == target_user.id)
+        )
+    ).rowcount
 
     target_user.email = tombstone_email(target_user.id)
     target_user.full_name = tombstone_name()
@@ -282,6 +289,7 @@ async def _execute_account_erasure(
             "target_user_id": str(target_user.id),
             "subjects_anonymised": len(subject_rows),
             "whatsapp_jobs_scrubbed": jobs_scrubbed,
+            "whatsapp_sessions_deleted": sessions_deleted,
             "retention_basis": "GDPR_17_3_d_POPIA_14_3_research",
         },
     )
