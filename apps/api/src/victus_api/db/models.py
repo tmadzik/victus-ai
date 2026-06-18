@@ -1056,6 +1056,15 @@ class WhatsAppSession(Base):
     last_message_id: Mapped[str | None] = mapped_column(
         String(128), nullable=True
     )
+    # Pseudonymous account anchored at consent (no email/name/phone on it). Lets
+    # captures persist to the clinician app and brings the participant under the
+    # standard account-erasure flow. SET NULL so a tombstoned user does not
+    # cascade-delete the (separately scrubbed) session.
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -1068,4 +1077,5 @@ class WhatsAppSession(Base):
 
     __table_args__ = (
         Index("ix_whatsapp_sessions_phone", "phone", unique=True),
+        Index("ix_whatsapp_sessions_user_id", "user_id"),
     )

@@ -11,13 +11,68 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from victus_api.audit.service import write_audit
 from victus_api.core.logging import get_logger
-from victus_api.db.models import WhatsAppSession
+from victus_api.db.models import (
+    AuditAction,
+    ConsentRecord,
+    ConsentType,
+    User,
+    UserRole,
+    WhatsAppSession,
+)
 from victus_api.whatsapp.conversation import ConvState, SessionData, advance
 from victus_api.whatsapp.meta import InboundMessage
 from victus_api.worker.jobs import enqueue, scrub_phone
 
 log = get_logger(__name__)
+
+# Versioned consent recorded when a WhatsApp participant replies YES — captured
+# as formal ConsentRecord rows (not just the session bool) so the consent is
+# auditable and the participant falls under the standard consent/erasure model.
+WHATSAPP_CONSENT_VERSION = "whatsapp-v1"
+WHATSAPP_CONSENT_TYPES: tuple[ConsentType, ...] = (
+    ConsentType.TRIAGE,
+    ConsentType.TOI_IMAGING,
+)
+
+
+async def _anchor_participant(db: AsyncSession, row: WhatsAppSession) -> User:
+    """Create a pseudonymous User + versioned consents the first time a phone
+    grants consent, and link it to the session.
+
+    The User holds NO PII (email / full_name / phone stay null) — it is purely
+    an identity anchor so captures persist to the clinician app and the
+    participant is reachable by the standard account-erasure flow. The phone
+    lives only on the session (deleted on STOP/erasure) and jobs (scrubbed).
+    """
+    user = User(role=UserRole.PATIENT, is_active=True)
+    db.add(user)
+    await db.flush()
+    row.user_id = user.id
+    for consent_type in WHATSAPP_CONSENT_TYPES:
+        db.add(
+            ConsentRecord(
+                user_id=user.id,
+                consent_type=consent_type,
+                version=WHATSAPP_CONSENT_VERSION,
+            )
+        )
+        await write_audit(
+            db,
+            action=AuditAction.CONSENT_GRANTED,
+            actor_id=user.id,
+            ip_address=None,
+            user_agent="whatsapp",
+            resource=f"whatsapp:consent:{user.id}",
+            metadata={
+                "consent_type": consent_type.value,
+                "version": WHATSAPP_CONSENT_VERSION,
+                "channel": "WHATSAPP",
+            },
+        )
+    log.info("whatsapp_participant_anchored", user_id=str(user.id))
+    return user
 
 
 def _to_data(row: WhatsAppSession) -> SessionData:
@@ -89,6 +144,12 @@ async def process_inbound(
     _apply(row, data)
     row.last_message_id = msg.message_id
 
+    # The moment consent is granted, anchor a pseudonymous account + versioned
+    # consents (once per participant) so the eventual capture persists and the
+    # participant is governable.
+    if row.consent and row.user_id is None:
+        await _anchor_participant(db, row)
+
     if turn.action is not None:
         await enqueue(
             db,
@@ -96,6 +157,7 @@ async def process_inbound(
             wa_phone=msg.from_phone,
             wa_message_id=msg.message_id,
             language=turn.action.language,
+            user_id=row.user_id,
             intake=turn.action.intake,
         )
         log.info("whatsapp_capture_enqueued", phone=msg.from_phone)

@@ -19,7 +19,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from victus_api.db.models import JobStatus, ProcessingJob, WhatsAppSession
+from victus_api.db.models import (
+    ConsentRecord,
+    JobStatus,
+    ProcessingJob,
+    User,
+    WhatsAppSession,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -129,6 +135,29 @@ async def _query_job_by_id(job_id: uuid.UUID) -> ProcessingJob | None:
             if job is not None:
                 s.expunge(job)
             return job
+    finally:
+        await engine.dispose()
+
+
+async def _query_user_and_consents(
+    user_id: uuid.UUID,
+) -> tuple[User | None, list[ConsentRecord]]:
+    engine = create_async_engine(os.environ["DATABASE_URL"], poolclass=NullPool)
+    try:
+        async with AsyncSession(engine) as s:
+            user = await s.get(User, user_id)
+            consents = list(
+                (
+                    await s.execute(
+                        select(ConsentRecord).where(ConsentRecord.user_id == user_id)
+                    )
+                ).scalars()
+            )
+            if user is not None:
+                s.expunge(user)
+            for c in consents:
+                s.expunge(c)
+            return user, consents
     finally:
         await engine.dispose()
 
@@ -259,3 +288,42 @@ def test_stop_command_erases_session_and_scrubs_jobs(client: Any) -> None:
     assert job.wa_phone is None
     assert job.media_id is None
     assert job.intake == {}
+
+
+def test_consent_anchors_user_and_links_capture(client: Any) -> None:
+    """Granting consent anchors a PSEUDONYMOUS user (no PII) with versioned
+    TRIAGE + TOI_IMAGING consents, links it to the session, and the eventual
+    capture job carries that user_id — so the capture persists to the clinician
+    app and the participant is governable."""
+    phone = _unique_phone()
+    media_id = f"MEDIA-{uuid.uuid4().hex[:8]}"
+
+    _send_text(client, phone, "1")    # language
+    _send_text(client, phone, "yes")  # consent → anchors the user
+
+    _, session = asyncio.run(_query(phone))
+    assert session is not None and session.user_id is not None
+    uid = session.user_id
+
+    user, consents = asyncio.run(_query_user_and_consents(uid))
+    assert user is not None
+    # Pseudonymous: no email / password / name stored on the anchor user.
+    assert user.email is None and user.hashed_password is None and user.full_name is None
+    active = {c.consent_type.value for c in consents if c.revoked_at is None}
+    assert active == {"TRIAGE", "TOI_IMAGING"}
+    assert all(c.version == "whatsapp-v1" for c in consents)
+
+    # Finish the flow → the queued capture is linked to the same user.
+    _send_text(client, phone, "42")
+    _send_text(client, phone, "2")
+    _send_text(client, phone, "170")
+    _send_text(client, phone, "72")
+    _send_text(client, phone, "88")
+    _send_text(client, phone, "yes")
+    for _ in range(5):
+        _send_text(client, phone, "no")
+    _send_video(client, phone, media_id)
+
+    jobs, _ = asyncio.run(_query(phone))
+    assert len(jobs) == 1
+    assert jobs[0].user_id == uid, "capture job must carry the anchored user_id"
