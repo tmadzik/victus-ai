@@ -3,10 +3,15 @@
  * deployment bundle. Run via `pnpm build:cpanel` (chains after `next build`).
  *
  * Produces:
- *   .next/standalone/            runnable in place (`pnpm start`)
- *   dist-cpanel/victus-marketing-cpanel.zip   upload to cPanel
+ *   .next/standalone/                            runnable in place (`pnpm start`)
+ *   dist-cpanel/victus-marketing-cpanel.tar.gz   upload to cPanel
  *
- * Bundle layout (zip root = Passenger application root):
+ * Ships as .tar.gz, not .zip: cPanel's ClamAV + Sanesecurity "Foxhole" ruleset
+ * flags ANY zip containing JavaScript (Foxhole.JS_Zip_*) as a false positive,
+ * which a Node bundle always trips. cPanel's File Manager extracts .tar.gz the
+ * same way (right-click -> Extract).
+ *
+ * Bundle layout (archive root = Passenger application root):
  *   app.js                       Passenger startup file
  *   apps/marketing/server.js    Next standalone server (used by app.js)
  *   apps/marketing/.next/...     compiled app + static assets
@@ -23,7 +28,7 @@ const appDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const standaloneDir = path.join(appDir, '.next', 'standalone');
 const appInStandalone = path.join(standaloneDir, 'apps', 'marketing');
 const distDir = path.join(appDir, 'dist-cpanel');
-const zipPath = path.join(distDir, 'victus-marketing-cpanel.zip');
+const tgzPath = path.join(distDir, 'victus-marketing-cpanel.tar.gz');
 
 if (!existsSync(path.join(appInStandalone, 'server.js'))) {
   console.error(
@@ -57,8 +62,10 @@ writeFileSync(
 );
 
 mkdirSync(distDir, { recursive: true });
-rmSync(zipPath, { force: true });
-execFileSync('zip', ['-qry', zipPath, '.'], { cwd: standaloneDir, stdio: 'inherit' });
+rmSync(tgzPath, { force: true });
+// Also clear any stale .zip from the previous packaging format.
+rmSync(path.join(distDir, 'victus-marketing-cpanel.zip'), { force: true });
+execFileSync('tar', ['-czf', tgzPath, '-C', standaloneDir, '.'], { stdio: 'inherit' });
 
-console.log(`cPanel bundle ready: ${path.relative(appDir, zipPath)}`);
+console.log(`cPanel bundle ready: ${path.relative(appDir, tgzPath)}`);
 console.log('Runnable locally:    PORT=3001 node .next/standalone/app.js');

@@ -51,8 +51,8 @@ jobs:
         id: artifact
         run: |
           ref="${{ github.event.release.tag_name || github.sha }}"
-          name="victus-marketing-cpanel-${ref}.zip"
-          cp apps/marketing/dist-cpanel/victus-marketing-cpanel.zip "$name"
+          name="victus-marketing-cpanel-${ref}.tar.gz"
+          cp apps/marketing/dist-cpanel/victus-marketing-cpanel.tar.gz "$name"
           echo "name=$name" >> "$GITHUB_OUTPUT"
 
       - name: Upload workflow artifact
