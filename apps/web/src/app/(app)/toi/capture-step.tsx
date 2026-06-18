@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { TOI_CAPTURE } from '@victus/contracts';
+import type { RppgFrame } from '@victus/contracts';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,11 @@ export function CaptureStep({
   const bufferRef = useRef<CaptureBuffer | null>(null);
   const samplerRef = useRef<RoiSampler | null>(null);
   const startedAtRef = useRef<number | null>(null);
+  // Monotonic token bumped on every (re)init and on stop(). An async camera
+  // init that resolves AFTER teardown — e.g. React StrictMode's dev-only
+  // double-mount, or a quick retry — can see it is stale and bail without
+  // clobbering state or leaking a MediaStream.
+  const initIdRef = useRef(0);
 
   const [state, setState] = useState<CaptureState>('idle');
   const [progress, setProgress] = useState<CaptureProgress | null>(null);
@@ -55,6 +61,7 @@ export function CaptureStep({
   const [landmarkerReady, setLandmarkerReady] = useState(false);
 
   const stop = useCallback((): void => {
+    initIdRef.current += 1; // invalidate any in-flight camera init
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
@@ -69,7 +76,10 @@ export function CaptureStep({
   useEffect(() => () => stop(), [stop]);
 
   const initCamera = useCallback(async (): Promise<void> => {
-    if (!videoRef.current) return;
+    const video = videoRef.current;
+    if (!video) return;
+    const myId = (initIdRef.current += 1);
+    const isStale = (): boolean => myId !== initIdRef.current;
     setErrorMessage(null);
     setState('preparing');
     try {
@@ -82,14 +92,35 @@ export function CaptureStep({
         },
         audio: false,
       });
+      // Torn down (unmount / retry) while awaiting permission — discard the
+      // freshly-acquired stream and bail rather than attaching it to a dead
+      // element.
+      if (isStale()) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
       streamRef.current = stream;
-      videoRef.current.srcObject = stream;
-      await videoRef.current.play();
+      video.srcObject = stream;
+      // play() rejects with AbortError when a new load request (a srcObject
+      // change or unmount) interrupts it — benign noise, not a capture
+      // failure, so swallow it instead of surfacing "Capture error".
+      try {
+        await video.play();
+      } catch (playErr) {
+        if (playErr instanceof DOMException && playErr.name === 'AbortError') {
+          return;
+        }
+        throw playErr;
+      }
+      if (isStale()) return;
 
       await getFaceLandmarker();
+      if (isStale()) return;
       setLandmarkerReady(true);
       setState('idle');
     } catch (err) {
+      // An interrupted load is not a user-facing error; everything else is.
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       stop();
       setErrorMessage(err instanceof Error ? err.message : String(err));
       setState('idle');
@@ -192,6 +223,47 @@ export function CaptureStep({
     rafRef.current = requestAnimationFrame(tick);
   }, [landmarkerReady, onCaptureComplete, onCaptureStart, onCaptureEnd]);
 
+  // Demo-only (NEXT_PUBLIC_ENABLE_DEMO_CAPTURE=1): bypass the webcam and submit
+  // a clean synthetic ROI-mean RGB trace — a green-dominant pulsatile AC on a
+  // skin-tone DC plus a slow respiratory drift — so the CHROM/POS pipeline
+  // recovers a high-SNR result and the full biomarker UI can be shown without a
+  // perfect lighting/stillness setup. This is NOT a real measurement.
+  const submitDemoSignal = useCallback((): void => {
+    stop();
+    const fps = 30;
+    const seconds = TARGET_DURATION_S;
+    const n = Math.round(fps * seconds);
+    const hrHz = 66 / 60;
+    const rrHz = 15 / 60;
+    const samples: RppgFrame[] = [];
+    for (let i = 0; i < n; i += 1) {
+      const t = i / fps;
+      const pulse = Math.sin(2 * Math.PI * hrHz * t);
+      const resp = Math.sin(2 * Math.PI * rrHz * t);
+      const jit = 0.03 * Math.sin(2 * Math.PI * 7.3 * t + 1.1);
+      samples.push({
+        t_ms: Math.round((i * 1000) / fps),
+        r: 180 + 0.4 * pulse + 0.8 * resp + jit,
+        g: 120 + 2.2 * pulse + 0.5 * resp + jit, // green channel strongest
+        b: 110 + 0.9 * pulse + 0.4 * resp + jit,
+      });
+    }
+    setErrorMessage(null);
+    onCaptureStart?.();
+    setState('done');
+    onCaptureEnd?.();
+    onCaptureComplete({
+      samples,
+      sampleRateHz: fps,
+      durationS: seconds,
+      motionScore: 1.0,
+      lightingScore: 0.95,
+      facePresenceRatio: 1.0,
+    });
+  }, [stop, onCaptureComplete, onCaptureStart, onCaptureEnd]);
+
+  const demoEnabled = process.env.NEXT_PUBLIC_ENABLE_DEMO_CAPTURE === '1';
+
   const remaining = progress
     ? Math.max(0, TARGET_DURATION_S - progress.elapsedSeconds)
     : TARGET_DURATION_S;
@@ -265,7 +337,17 @@ export function CaptureStep({
           </div>
         ) : null}
 
-        <div className="flex justify-end gap-3">
+        <div className="flex items-center justify-end gap-3">
+          {state !== 'capturing' && demoEnabled ? (
+            <Button
+              onClick={submitDemoSignal}
+              size="lg"
+              variant="outline"
+              disabled={disabled}
+            >
+              Use demo signal
+            </Button>
+          ) : null}
           {state !== 'capturing' ? (
             <Button
               onClick={startCapture}
@@ -280,6 +362,12 @@ export function CaptureStep({
             </Button>
           ) : null}
         </div>
+        {demoEnabled && state !== 'capturing' ? (
+          <p className="text-right text-xs text-brand-600">
+            Demo mode: submits a synthetic high-SNR pulse to exercise the
+            pipeline — not a real measurement.
+          </p>
+        ) : null}
       </CardContent>
     </Card>
   );
