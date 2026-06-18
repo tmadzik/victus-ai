@@ -51,8 +51,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Sync dependencies (dev + ml)
-        run: uv sync --extra dev --extra ml
+      - name: Sync dependencies (dev + ml + video)
+        run: uv sync --extra dev --extra ml --extra video
 
       - name: Ruff lint
         run: uv run ruff check .

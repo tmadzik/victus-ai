@@ -57,6 +57,7 @@ from victus_api.governance.schemas import (
 )
 from victus_api.notifications.schemas import NotificationType
 from victus_api.notifications.service import fan_out_to_admins
+from victus_api.worker.jobs import scrub_user
 
 log = get_logger(__name__)
 
@@ -254,6 +255,10 @@ async def _execute_account_erasure(
         delete(RefreshToken).where(RefreshToken.user_id == target_user.id)
     )
 
+    # Bring the WhatsApp rail under erasure: scrub PII from any processing jobs
+    # linked to this account (phone, media, intake, derived vitals).
+    jobs_scrubbed = await scrub_user(db, target_user.id)
+
     target_user.email = tombstone_email(target_user.id)
     target_user.full_name = tombstone_name()
     target_user.hashed_password = None
@@ -276,6 +281,7 @@ async def _execute_account_erasure(
             "erasure_request_id": str(request_row.id),
             "target_user_id": str(target_user.id),
             "subjects_anonymised": len(subject_rows),
+            "whatsapp_jobs_scrubbed": jobs_scrubbed,
             "retention_basis": "GDPR_17_3_d_POPIA_14_3_research",
         },
     )

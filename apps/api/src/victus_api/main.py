@@ -30,6 +30,7 @@ from victus_api.study.router import router as study_router
 from victus_api.toi.router import router as toi_router
 from victus_api.triage.router import router as triage_router
 from victus_api.users.router import router as users_router
+from victus_api.whatsapp.router import router as whatsapp_router
 
 log = get_logger(__name__)
 
@@ -119,6 +120,7 @@ def create_app() -> FastAPI:
     app.include_router(governance_router)
     app.include_router(governance_admin_router)
     app.include_router(notifications_router)
+    app.include_router(whatsapp_router)
 
     @app.get("/healthz", tags=["meta"])
     async def healthz() -> dict[str, str]:

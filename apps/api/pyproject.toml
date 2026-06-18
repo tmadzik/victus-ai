@@ -48,6 +48,12 @@ ml = [
     "scikit-learn>=1.5.2",
     "pandas>=2.2.3",
 ]
+# WhatsApp rail: server-side video → rPPG RGB extraction (background worker only).
+# Headless OpenCV (no GUI/X11) keeps it cPanel-friendly; the Haar face cascade
+# ships inside the wheel, so there is no model file to vendor.
+video = [
+    "opencv-python-headless>=4.10.0",
+]
 
 [build-system]
 requires = ["hatchling>=1.26"]
