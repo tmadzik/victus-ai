@@ -287,6 +287,29 @@ def load_stroke(path: Path) -> list[HarmonizedRecord]:
 # --- Orchestrator ------------------------------------------------------------
 
 
+def load_research_jsonl(path: Path) -> list[dict]:
+    """Load the research-console export (``/research/triage-cases/export``).
+
+    Each line is a recruited, ground-truth-labelled case: features + the three
+    REAL per-disease labels + capture domain. These labels are used directly
+    (not re-derived from features), so the model learns from clinician-confirmed
+    ground truth — the whole point of the recruitment data.
+    """
+    import json
+
+    if not path.is_file():
+        log.warning("research_jsonl_missing", path=str(path))
+        return []
+    rows: list[dict] = []
+    with path.open("r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if line:
+                rows.append(json.loads(line))
+    log.info("research_jsonl_loaded", count=len(rows), path=str(path))
+    return rows
+
+
 def load_all(data_dir: Path) -> list[HarmonizedRecord]:
     all_records: list[HarmonizedRecord] = []
     all_records.extend(load_bodyfat(data_dir / "body_fat_prediction" / "bodyfat.csv"))

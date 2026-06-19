@@ -1079,3 +1079,83 @@ class WhatsAppSession(Base):
         Index("ix_whatsapp_sessions_phone", "phone", unique=True),
         Index("ix_whatsapp_sessions_user_id", "user_id"),
     )
+
+
+class ResearchTriageCase(Base):
+    """A clinician/CHW-entered, ground-truth-LABELLED triage case for training.
+
+    Unlike ``triage_assessments`` (model *predictions*), this stores real
+    measurements + symptoms + CONFIRMED per-disease labels. Obesity and
+    hypertension labels are objective (measured BMI / BP); the diabetes label is
+    anchored on HbA1c / fasting glucose (the ground truth the proxy model can't
+    see). Exported as the training corpus for the multi-head DANN-EDL so Model 1
+    learns from recruited data, not proxies. ``capture_domain`` feeds the DANN
+    domain head (CLINICAL_GRADE vs CHW_TAPE_MEASURE).
+    """
+
+    __tablename__ = "research_triage_cases"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    # Researcher who entered it; SET NULL on erasure so the de-identified case
+    # is retained for research integrity.
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    study_subject_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("study_subjects.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    # "CLINICAL_GRADE" | "CHW_TAPE_MEASURE" — measurement provenance (DANN domain).
+    capture_domain: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default="CLINICAL_GRADE"
+    )
+
+    # --- measured inputs (the model features) ---
+    age_years: Mapped[int] = mapped_column(Integer, nullable=False)
+    sex: Mapped[str] = mapped_column(String(16), nullable=False)  # MALE|FEMALE|OTHER
+    height_cm: Mapped[float] = mapped_column(Float, nullable=False)
+    weight_kg: Mapped[float] = mapped_column(Float, nullable=False)
+    waist_cm: Mapped[float] = mapped_column(Float, nullable=False)
+    hip_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    systolic_bp_mmhg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    diastolic_bp_mmhg: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # --- structured symptom audit (same vocabulary as Pathway A) ---
+    safety_triggers: Mapped[list[str]] = mapped_column(
+        ARRAY(String(64)), nullable=False, default=list, server_default="{}"
+    )
+    contextual: Mapped[list[str]] = mapped_column(
+        ARRAY(String(64)), nullable=False, default=list, server_default="{}"
+    )
+
+    # --- diabetes ground truth (one or both) ---
+    fasting_glucose_mmol_l: Mapped[float | None] = mapped_column(Float, nullable=True)
+    hba1c_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # --- confirmed per-disease labels (the training targets) ---
+    obesity_label: Mapped[RiskClass] = mapped_column(
+        SAEnum(RiskClass, name="risk_class", native_enum=True), nullable=False
+    )
+    hypertension_label: Mapped[RiskClass] = mapped_column(
+        SAEnum(RiskClass, name="risk_class", native_enum=True), nullable=False
+    )
+    diabetes_label: Mapped[RiskClass] = mapped_column(
+        SAEnum(RiskClass, name="risk_class", native_enum=True), nullable=False
+    )
+    # Per-disease human-legible derivation (e.g. {"diabetes": "HbA1c 7.2% -> HIGH"}).
+    label_basis: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default="{}"
+    )
+    notes: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_research_triage_cases_created_at", "created_at"),
+        Index("ix_research_triage_cases_capture_domain", "capture_domain"),
+    )
