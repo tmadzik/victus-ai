@@ -43,6 +43,7 @@ from victus_api.training.datasets import (
     class_distribution,
     domain_distribution,
     load_all,
+    load_research_jsonl,
     source_distribution,
     synthesize_chw_domain,
 )
@@ -51,6 +52,7 @@ from victus_api.training.harmonize import (
     CLASS_INDEX,
     DOMAIN_INDEX,
     DOMAINS,
+    Domain,
     HarmonizedRecord,
 )
 from victus_api.training.loop import (
@@ -66,7 +68,7 @@ from victus_api.triage.edl.dirichlet import (
 )
 from victus_api.triage.edl.inference import per_disease_label_from_features
 from victus_api.triage.features import FEATURE_NAMES
-from victus_api.triage.schemas import DISEASES, RISK_CLASSES
+from victus_api.triage.schemas import DISEASES, RISK_CLASSES, RiskClass
 
 DEFAULT_HIDDEN_DIMS: tuple[int, ...] = (64, 32)
 DEFAULT_DATA_DIR = Path(
@@ -195,6 +197,55 @@ def _stratified_split(
     )
 
 
+def _research_matrix(
+    rows: list[dict],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Convert research-console rows to (features, per-disease labels, domain).
+
+    Uses the stored REAL labels directly — recruited ground truth, not the
+    proxy derivation applied to the synthetic corpus.
+    """
+    xs: list[list[float]] = []
+    ys: list[list[int]] = []
+    ds: list[int] = []
+    for r in rows:
+        rec = HarmonizedRecord(
+            source="research",
+            domain=Domain(r["domain"]),
+            height_cm=float(r["height_cm"]),
+            weight_kg=float(r["weight_kg"]),
+            waist_cm=float(r["waist_cm"]),
+            hip_cm=float(r["hip_cm"]) if r.get("hip_cm") is not None else None,
+            age_years=int(r["age_years"]),
+            sex=str(r["sex"]),
+            systolic_bp_mmhg=(
+                float(r["systolic_bp_mmhg"])
+                if r.get("systolic_bp_mmhg") is not None
+                else None
+            ),
+            diastolic_bp_mmhg=(
+                float(r["diastolic_bp_mmhg"])
+                if r.get("diastolic_bp_mmhg") is not None
+                else None
+            ),
+            risk_class=RiskClass(r["obesity_label"]),  # unused by the multi-head heads
+        )
+        xs.append(rec.feature_vector())
+        ys.append(
+            [
+                CLASS_INDEX[RiskClass(r["obesity_label"])],
+                CLASS_INDEX[RiskClass(r["hypertension_label"])],
+                CLASS_INDEX[RiskClass(r["diabetes_label"])],
+            ]
+        )
+        ds.append(DOMAIN_INDEX[Domain(r["domain"])])
+    return (
+        np.asarray(xs, dtype=np.float32),
+        np.asarray(ys, dtype=np.int64),
+        np.asarray(ds, dtype=np.int64),
+    )
+
+
 def _run_multihead(args: argparse.Namespace, records: list[HarmonizedRecord], log) -> int:  # noqa: ANN001
     """Train + export the per-disease multi-head DANN evidential model."""
     chw_records = synthesize_chw_domain(
@@ -203,6 +254,18 @@ def _run_multihead(args: argparse.Namespace, records: list[HarmonizedRecord], lo
     records = records + chw_records
 
     x, y, d = _build_multihead_matrix(records)
+
+    # Merge recruited, ground-truth-labelled cases (their REAL labels are used
+    # as-is). This is how the model graduates from dataset proxies to real data.
+    if args.research_jsonl:
+        research_rows = load_research_jsonl(Path(args.research_jsonl))
+        if research_rows:
+            xr, yr, dr = _research_matrix(research_rows)
+            x = np.concatenate([x, xr], axis=0)
+            y = np.concatenate([y, yr], axis=0)
+            d = np.concatenate([d, dr], axis=0)
+            log.info("research_data_merged", count=len(research_rows))
+
     per_disease_dist = _per_disease_distribution(y)
     log.info(
         "multihead_dataset_distribution",
@@ -348,6 +411,14 @@ def main(argv: list[str] | None = None) -> int:
         "(dann_multihead_v1): one evidential head per disease over a shared, "
         "domain-invariant trunk. Implies the DANN domain adversary + CHW "
         "synthesis.",
+    )
+    parser.add_argument(
+        "--research-jsonl",
+        type=str,
+        default=None,
+        help="Path to a research-console export (JSONL). Merges recruited, "
+        "ground-truth-labelled cases into the multi-head training set, using "
+        "their real per-disease labels instead of dataset proxies.",
     )
     parser.add_argument(
         "--chw-noise-multiplier",
