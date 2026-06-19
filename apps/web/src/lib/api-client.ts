@@ -31,6 +31,11 @@ import {
   NotificationListResponseSchema,
   type RecordCalibrationRequest,
   type RegisterRequest,
+  type ResearchCaseCreate,
+  type ResearchCaseResponse,
+  ResearchCaseResponseSchema,
+  type ResearchCorpusStats,
+  ResearchCorpusStatsSchema,
   type StartSessionRequest,
   type StudySessionResponse,
   StudySessionResponseSchema,
@@ -328,6 +333,41 @@ export const apiClient = {
       throw new ApiError(502, 'invalid_response', 'Expected array of records.');
     }
     return raw.map((item) => CalibrationRecordResponseSchema.parse(item));
+  },
+
+  // ---- Research console (labelled triage capture) -------------------------
+
+  async createResearchCase(
+    accessToken: string,
+    payload: ResearchCaseCreate,
+  ): Promise<ResearchCaseResponse> {
+    const raw = await request<unknown>('/research/triage-cases', {
+      method: 'POST',
+      accessToken,
+      body: payload,
+    });
+    return ResearchCaseResponseSchema.parse(raw);
+  },
+
+  async listResearchCases(
+    accessToken: string,
+    limit = 50,
+  ): Promise<ResearchCaseResponse[]> {
+    const raw = await request<unknown>(
+      `/research/triage-cases?limit=${limit}`,
+      { accessToken },
+    );
+    if (!Array.isArray(raw)) {
+      throw new ApiError(502, 'invalid_response', 'Expected array of cases.');
+    }
+    return raw.map((item) => ResearchCaseResponseSchema.parse(item));
+  },
+
+  async getResearchStats(accessToken: string): Promise<ResearchCorpusStats> {
+    const raw = await request<unknown>('/research/triage-cases/stats', {
+      accessToken,
+    });
+    return ResearchCorpusStatsSchema.parse(raw);
   },
 
   // ---- Data governance ----------------------------------------------------

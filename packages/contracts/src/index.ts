@@ -966,3 +966,72 @@ export const AuditLogResponseSchema = z.object({
   offset: z.number().int().nonnegative(),
 });
 export type AuditLogResponse = z.infer<typeof AuditLogResponseSchema>;
+
+// ---- Research console: labelled triage capture (Model 1 training data) ----
+
+export const CaptureDomain = {
+  CLINICAL_GRADE: 'CLINICAL_GRADE',
+  CHW_TAPE_MEASURE: 'CHW_TAPE_MEASURE',
+} as const;
+export type CaptureDomain = (typeof CaptureDomain)[keyof typeof CaptureDomain];
+export const CaptureDomainSchema = z.nativeEnum(CaptureDomain);
+
+/** A labelled case. Obesity/hypertension are derived from measured BMI/BP;
+ *  diabetes from HbA1c / fasting glucose. Any label may be overridden. */
+export const ResearchCaseCreateSchema = z.object({
+  age_years: z.number().int().min(1).max(120),
+  sex: SexSchema,
+  height_cm: z.number().min(50).max(250),
+  weight_kg: z.number().min(5).max(400),
+  waist_cm: z.number().min(30).max(250),
+  hip_cm: z.number().min(40).max(250).optional(),
+  systolic_bp_mmhg: z.number().min(50).max(300).optional(),
+  diastolic_bp_mmhg: z.number().min(30).max(200).optional(),
+  safety_triggers: z.array(z.enum(SAFETY_OVERRIDE_SYMPTOM_KEYS)).default([]),
+  contextual: z.array(z.enum(CONTEXTUAL_SYMPTOM_KEYS)).default([]),
+  fasting_glucose_mmol_l: z.number().min(1).max(50).optional(),
+  hba1c_percent: z.number().min(3).max(20).optional(),
+  capture_domain: CaptureDomainSchema.default(CaptureDomain.CLINICAL_GRADE),
+  study_subject_id: z.string().uuid().optional(),
+  obesity_label: RiskClassSchema.optional(),
+  hypertension_label: RiskClassSchema.optional(),
+  diabetes_label: RiskClassSchema.optional(),
+  notes: z.string().max(2000).optional(),
+});
+export type ResearchCaseCreate = z.infer<typeof ResearchCaseCreateSchema>;
+
+export const ResearchCaseResponseSchema = z.object({
+  id: z.string().uuid(),
+  capture_domain: z.string(),
+  age_years: z.number().int(),
+  sex: z.string(),
+  height_cm: z.number(),
+  weight_kg: z.number(),
+  waist_cm: z.number(),
+  bmi: z.number(),
+  whtr: z.number().nullable(),
+  systolic_bp_mmhg: z.number().nullable(),
+  diastolic_bp_mmhg: z.number().nullable(),
+  hba1c_percent: z.number().nullable(),
+  fasting_glucose_mmol_l: z.number().nullable(),
+  obesity_label: RiskClassSchema,
+  hypertension_label: RiskClassSchema,
+  diabetes_label: RiskClassSchema,
+  label_basis: z.record(z.string(), z.string()),
+  study_subject_id: z.string().uuid().nullable(),
+  created_at: z.string(),
+});
+export type ResearchCaseResponse = z.infer<typeof ResearchCaseResponseSchema>;
+
+export const ResearchCorpusStatsSchema = z.object({
+  total: z.number().int().nonnegative(),
+  by_domain: z.record(z.string(), z.number()),
+  label_distribution: z.object({
+    obesity: z.record(z.string(), z.number()),
+    hypertension: z.record(z.string(), z.number()),
+    diabetes: z.record(z.string(), z.number()),
+  }),
+  with_bp: z.number().int().nonnegative(),
+  with_diabetes_marker: z.number().int().nonnegative(),
+});
+export type ResearchCorpusStats = z.infer<typeof ResearchCorpusStatsSchema>;

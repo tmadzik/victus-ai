@@ -16,6 +16,7 @@ type NavHref =
   | '/dashboard'
   | '/triage'
   | '/toi'
+  | '/research'
   | '/account/data'
   | '/admin/governance';
 
@@ -26,8 +27,19 @@ const NAV: { href: NavHref; label: string }[] = [
   { href: '/account/data', label: 'Data & erasure' },
 ];
 
+// Researchers (CHW / clinician / admin) get the labelled-data capture console.
+const RESEARCH_NAV: { href: NavHref; label: string }[] = [
+  { href: '/research', label: 'Research' },
+];
+
 const ADMIN_NAV: { href: NavHref; label: string }[] = [
   { href: '/admin/governance', label: 'Admin' },
+];
+
+const RESEARCHER_ROLES: readonly UserRole[] = [
+  UserRole.CHW,
+  UserRole.CLINICIAN,
+  UserRole.ADMIN,
 ];
 
 export function AppShell({
@@ -40,8 +52,11 @@ export function AppShell({
   children: React.ReactNode;
 }): React.ReactElement {
   const pathname = usePathname();
-  const navItems =
-    user.role === UserRole.ADMIN ? [...NAV, ...ADMIN_NAV] : NAV;
+  const navItems = [
+    ...NAV,
+    ...(RESEARCHER_ROLES.includes(user.role) ? RESEARCH_NAV : []),
+    ...(user.role === UserRole.ADMIN ? ADMIN_NAV : []),
+  ];
 
   return (
     <div className="flex min-h-dvh flex-col">
