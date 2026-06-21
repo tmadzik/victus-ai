@@ -19,13 +19,24 @@ There are four deployables:
 > offer it, run the API + worker on a small VPS and keep cPanel for the two
 > front-ends — nothing else changes.
 
+> **MVP launch profile — host has PostgreSQL + Python 3.12 but no background
+> process/cron:** deploy pieces **1, 3, 4 (API, web, marketing)** and **skip the
+> worker (piece 2 / Step 4)**. The worker is the only deployable that is a
+> background job; the API is request-driven under Passenger, so "no background
+> process" does **not** block it. Skipping the worker turns the WhatsApp rail off
+> — inbound messages would queue but never get a reply, so it's all-or-nothing
+> and stays off until you have either cron (worker Path A) or a small VPS for the
+> worker alone. Everything the MVP demonstrates — web triage, in-browser TOI/rPPG,
+> and the `/research` console — runs without it.
+
 ---
 
 ## Step 0 — Confirm host capabilities
 
 Run the **[Send-to-host checklist](#send-to-host-checklist)** at the bottom. Do
 not start until you have a yes on PostgreSQL + Python 3.12, or a decision to put
-the API/worker on a VPS.
+the API/worker on a VPS. A **no on cron/background process** is _not_ a blocker —
+it only defers the worker; see the **MVP launch profile** callout above.
 
 ## Step 1 — DNS + subdomains (one-time)
 
