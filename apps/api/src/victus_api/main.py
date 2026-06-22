@@ -18,6 +18,7 @@ from sqlalchemy import text
 from victus_api import __version__
 from victus_api.auth.router import router as auth_router
 from victus_api.calibration.router import router as calibration_router
+from victus_api.clinical.router import router as clinical_router
 from victus_api.config import Settings, get_settings
 from victus_api.core.exceptions import register_exception_handlers
 from victus_api.core.logging import configure_logging, get_logger, request_id_var
@@ -123,6 +124,7 @@ def create_app() -> FastAPI:
     app.include_router(notifications_router)
     app.include_router(whatsapp_router)
     app.include_router(research_router)
+    app.include_router(clinical_router)
 
     @app.get("/healthz", tags=["meta"])
     async def healthz() -> dict[str, str]:

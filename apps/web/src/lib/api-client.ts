@@ -29,6 +29,10 @@ import {
   MyDataSummarySchema,
   type NotificationListResponse,
   NotificationListResponseSchema,
+  type ParticipantHistory,
+  ParticipantHistorySchema,
+  type ParticipantSummary,
+  ParticipantSummarySchema,
   type RecordCalibrationRequest,
   type RegisterRequest,
   type ResearchCaseCreate,
@@ -590,6 +594,35 @@ export const apiClient = {
       { accessToken },
     );
     return AuditLogResponseSchema.parse(raw);
+  },
+
+  // ---- Clinician participant review ---------------------------------------
+
+  async searchParticipants(
+    accessToken: string,
+    query: string,
+    limit = 25,
+  ): Promise<ParticipantSummary[]> {
+    const params = new URLSearchParams({ q: query, limit: String(limit) });
+    const raw = await request<unknown>(`/clinical/participants?${params}`, {
+      accessToken,
+    });
+    if (!Array.isArray(raw)) {
+      throw new ApiError(502, 'invalid_response', 'Expected array of participants.');
+    }
+    return raw.map((item) => ParticipantSummarySchema.parse(item));
+  },
+
+  async getParticipantHistory(
+    accessToken: string,
+    userId: string,
+    limit = 50,
+  ): Promise<ParticipantHistory> {
+    const raw = await request<unknown>(
+      `/clinical/participants/${userId}/history?limit=${limit}`,
+      { accessToken },
+    );
+    return ParticipantHistorySchema.parse(raw);
   },
 };
 
