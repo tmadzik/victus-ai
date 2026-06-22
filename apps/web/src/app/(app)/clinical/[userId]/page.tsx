@@ -1,13 +1,19 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
-import { type ParticipantHistory, UserRole } from '@victus/contracts';
+import {
+  type ParticipantHistory,
+  type ReferralResponse,
+  UserRole,
+} from '@victus/contracts';
 
 import { AssessmentTimeline } from '@/components/assessment-timeline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ApiError, apiClient } from '@/lib/api-client';
 import { auth } from '@/lib/auth';
+
+import { ReferralsPanel } from './referrals-panel';
 
 export const metadata = { title: 'Participant record — Victus AI' };
 
@@ -25,9 +31,13 @@ export default async function ParticipantRecordPage({
   const { userId } = await params;
 
   let record: ParticipantHistory | null = null;
+  let referrals: ReferralResponse[] = [];
   let error: string | null = null;
   try {
-    record = await apiClient.getParticipantHistory(session.accessToken, userId);
+    [record, referrals] = await Promise.all([
+      apiClient.getParticipantHistory(session.accessToken, userId),
+      apiClient.listParticipantReferrals(session.accessToken, userId),
+    ]);
   } catch (err) {
     error = err instanceof ApiError ? err.message : 'Could not load this participant.';
   }
@@ -68,6 +78,8 @@ export default async function ParticipantRecordPage({
           <Stat label="TOI" value={String(p.toi_count)} />
         </div>
       </header>
+
+      <ReferralsPanel participantId={userId} referrals={referrals} />
 
       <AssessmentTimeline
         triage={record.triage}

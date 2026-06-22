@@ -16,6 +16,7 @@ export const en = {
     triage: 'Pathway A — Triage',
     toi: 'Pathway B — TOI',
     history: 'History',
+    referrals: 'Referrals',
     clinical: 'Clinical',
     research: 'Research',
     data: 'Data & erasure',

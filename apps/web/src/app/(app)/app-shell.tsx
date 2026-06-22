@@ -20,6 +20,7 @@ type NavHref =
   | '/triage'
   | '/toi'
   | '/history'
+  | '/referrals'
   | '/clinical'
   | '/research'
   | '/account/data'
@@ -33,6 +34,7 @@ const NAV: NavItem[] = [
   { href: '/triage', key: 'triage' },
   { href: '/toi', key: 'toi' },
   { href: '/history', key: 'history' },
+  { href: '/referrals', key: 'referrals' },
   { href: '/account/data', key: 'data' },
 ];
 

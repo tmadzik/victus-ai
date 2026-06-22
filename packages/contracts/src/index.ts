@@ -1058,3 +1058,71 @@ export const ParticipantHistorySchema = z.object({
   toi: z.array(ToiAssessmentResponseSchema),
 });
 export type ParticipantHistory = z.infer<typeof ParticipantHistorySchema>;
+
+// ===========================================================================
+// CARE-NAVIGATION REFERRALS
+// ===========================================================================
+
+export const ReferralUrgency = {
+  ROUTINE: 'ROUTINE',
+  URGENT: 'URGENT',
+  EMERGENCY: 'EMERGENCY',
+} as const;
+export type ReferralUrgency = (typeof ReferralUrgency)[keyof typeof ReferralUrgency];
+
+export const ReferralStatus = {
+  PENDING: 'PENDING',
+  ACKNOWLEDGED: 'ACKNOWLEDGED',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+} as const;
+export type ReferralStatus = (typeof ReferralStatus)[keyof typeof ReferralStatus];
+
+export const ReferralDestinationType = {
+  VICTUS_FACILITY: 'VICTUS_FACILITY',
+  PUBLIC_CLINIC: 'PUBLIC_CLINIC',
+  HOSPITAL: 'HOSPITAL',
+  OTHER: 'OTHER',
+} as const;
+export type ReferralDestinationType =
+  (typeof ReferralDestinationType)[keyof typeof ReferralDestinationType];
+
+export const REFERRAL_DESTINATION_LABELS: Record<ReferralDestinationType, string> = {
+  VICTUS_FACILITY: 'Victus facility',
+  PUBLIC_CLINIC: 'Public clinic',
+  HOSPITAL: 'Hospital',
+  OTHER: 'Other',
+};
+
+export const CreateReferralSchema = z.object({
+  participant_user_id: z.string().uuid(),
+  destination_type: z.nativeEnum(ReferralDestinationType),
+  destination_name: z.string().min(1).max(200),
+  reason: z.string().min(1).max(1000),
+  urgency: z.nativeEnum(ReferralUrgency),
+  source_triage_assessment_id: z.string().uuid().optional().nullable(),
+  notes: z.string().max(1000).optional().nullable(),
+});
+export type CreateReferral = z.infer<typeof CreateReferralSchema>;
+
+export const UpdateReferralStatusSchema = z.object({
+  status: z.nativeEnum(ReferralStatus),
+  notes: z.string().max(1000).optional().nullable(),
+});
+export type UpdateReferralStatus = z.infer<typeof UpdateReferralStatusSchema>;
+
+export const ReferralResponseSchema = z.object({
+  id: z.string().uuid(),
+  participant_user_id: z.string().uuid(),
+  created_by_user_id: z.string().uuid().nullable(),
+  source_triage_assessment_id: z.string().uuid().nullable(),
+  destination_type: z.string(),
+  destination_name: z.string(),
+  reason: z.string(),
+  urgency: z.string(),
+  status: z.string(),
+  notes: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type ReferralResponse = z.infer<typeof ReferralResponseSchema>;

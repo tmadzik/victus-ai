@@ -71,6 +71,9 @@ class AuditAction(str, enum.Enum):
     ERASURE_REQUEST_REJECTED = "ERASURE_REQUEST_REJECTED"
     # A clinician/CHW searched for or opened a participant's identified record.
     CLINICIAN_PARTICIPANT_VIEWED = "CLINICIAN_PARTICIPANT_VIEWED"
+    # Care-navigation referrals.
+    REFERRAL_CREATED = "REFERRAL_CREATED"
+    REFERRAL_STATUS_UPDATED = "REFERRAL_STATUS_UPDATED"
 
 
 class ErasureJurisdiction(str, enum.Enum):
@@ -1160,4 +1163,87 @@ class ResearchTriageCase(Base):
     __table_args__ = (
         Index("ix_research_triage_cases_created_at", "created_at"),
         Index("ix_research_triage_cases_capture_domain", "capture_domain"),
+    )
+
+
+class ReferralUrgency(str, enum.Enum):
+    ROUTINE = "ROUTINE"
+    URGENT = "URGENT"
+    EMERGENCY = "EMERGENCY"
+
+
+class ReferralStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+
+
+class ReferralDestinationType(str, enum.Enum):
+    VICTUS_FACILITY = "VICTUS_FACILITY"
+    PUBLIC_CLINIC = "PUBLIC_CLINIC"
+    HOSPITAL = "HOSPITAL"
+    OTHER = "OTHER"
+
+
+class Referral(Base):
+    """A care-navigation referral: a CHW/clinician directs a participant to a
+    destination (a Victus facility or an external clinic/hospital), optionally
+    linked to the triage assessment that prompted it, with a tracked status."""
+
+    __tablename__ = "referrals"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    # The referred participant. CASCADE: a referral is meaningless once the
+    # participant account is hard-deleted.
+    participant_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # The clinician/CHW who raised it; SET NULL on their erasure (the referral
+    # itself stays, for the participant's care record).
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    # Optional provenance: the Pathway A assessment that flagged the referral.
+    source_triage_assessment_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("triage_assessments.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    destination_type: Mapped[ReferralDestinationType] = mapped_column(
+        SAEnum(ReferralDestinationType, name="referral_destination_type", native_enum=True),
+        nullable=False,
+    )
+    destination_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    reason: Mapped[str] = mapped_column(String(1000), nullable=False)
+    urgency: Mapped[ReferralUrgency] = mapped_column(
+        SAEnum(ReferralUrgency, name="referral_urgency", native_enum=True), nullable=False
+    )
+    status: Mapped[ReferralStatus] = mapped_column(
+        SAEnum(ReferralStatus, name="referral_status", native_enum=True),
+        nullable=False,
+        server_default=ReferralStatus.PENDING.value,
+    )
+    notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_referrals_participant_created", "participant_user_id", "created_at"
+        ),
     )
