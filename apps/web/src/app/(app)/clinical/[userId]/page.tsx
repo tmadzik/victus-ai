@@ -56,6 +56,13 @@ export default async function ParticipantRecordPage({
   }
 
   const p = record.participant;
+  // Offer RED triage assessments that don't already have a referral linked.
+  const linkedIds = new Set(
+    referrals.map((r) => r.source_triage_assessment_id).filter(Boolean),
+  );
+  const suggestions = record.triage.filter(
+    (t) => t.overall_state === 'RED' && !linkedIds.has(t.id),
+  );
   return (
     <div className="space-y-6">
       <BackLink />
@@ -79,7 +86,11 @@ export default async function ParticipantRecordPage({
         </div>
       </header>
 
-      <ReferralsPanel participantId={userId} referrals={referrals} />
+      <ReferralsPanel
+        participantId={userId}
+        referrals={referrals}
+        suggestions={suggestions}
+      />
 
       <AssessmentTimeline
         triage={record.triage}

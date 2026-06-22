@@ -4,11 +4,14 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 
 import {
+  type Disease,
+  DISEASE_LABELS,
   REFERRAL_DESTINATION_LABELS,
   type ReferralDestinationType,
   type ReferralResponse,
   type ReferralStatus,
   ReferralUrgency,
+  type TriageAssessmentResponse,
 } from '@victus/contracts';
 
 import { Badge, type BadgeProps } from '@/components/ui/badge';
@@ -49,12 +52,34 @@ const NEXT_STATUSES: Record<string, ReferralStatus[]> = {
 const INPUT_CLASS =
   'w-full rounded-[var(--radius-control)] border border-brand-200 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500';
 
+function suggestionDate(a: TriageAssessmentResponse): string {
+  return new Date(a.created_at).toLocaleDateString('en-ZA', { dateStyle: 'medium' });
+}
+
+// A RED triage assessment implies an urgent referral; a safety override (the
+// deterministic immediate-referral path) escalates it to an emergency.
+function suggestionUrgency(a: TriageAssessmentResponse): ReferralUrgency {
+  return a.safety_override_triggered ? 'EMERGENCY' : 'URGENT';
+}
+
+function suggestionReason(a: TriageAssessmentResponse): string {
+  const reds = a.per_disease
+    .filter((d) => d.state === 'RED')
+    .map((d) => DISEASE_LABELS[d.disease as Disease]);
+  const drivers = reds.length > 0 ? `${reds.join(', ')} flagged RED` : 'overall RED';
+  const override = a.safety_override_triggered ? ' Safety override triggered.' : '';
+  return `Pathway A triage (${suggestionDate(a)}): ${drivers}.${override}`;
+}
+
 export function ReferralsPanel({
   participantId,
   referrals,
+  suggestions,
 }: {
   participantId: string;
   referrals: ReferralResponse[];
+  // RED triage assessments not yet linked to a referral — offered as pre-fills.
+  suggestions: TriageAssessmentResponse[];
 }): React.ReactElement {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -64,6 +89,14 @@ export function ReferralsPanel({
   const [destinationName, setDestinationName] = useState('');
   const [urgency, setUrgency] = useState<ReferralUrgency>(ReferralUrgency.ROUTINE);
   const [reason, setReason] = useState('');
+  const [sourceAssessmentId, setSourceAssessmentId] = useState<string | null>(null);
+
+  function applySuggestion(a: TriageAssessmentResponse): void {
+    setReason(suggestionReason(a));
+    setUrgency(suggestionUrgency(a));
+    setSourceAssessmentId(a.id);
+    setError(null);
+  }
 
   function submit(e: React.FormEvent): void {
     e.preventDefault();
@@ -75,6 +108,7 @@ export function ReferralsPanel({
         destination_name: destinationName,
         urgency,
         reason,
+        source_triage_assessment_id: sourceAssessmentId,
       });
       if (!res.ok) {
         setError(res.error);
@@ -83,6 +117,7 @@ export function ReferralsPanel({
       setDestinationName('');
       setReason('');
       setUrgency(ReferralUrgency.ROUTINE);
+      setSourceAssessmentId(null);
       router.refresh();
     });
   }
@@ -105,6 +140,36 @@ export function ReferralsPanel({
         <CardTitle className="text-lg">Referrals</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        {suggestions.length > 0 ? (
+          <div className="rounded-[var(--radius-control)] border border-rose-200 bg-rose-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-rose-700">
+              Suggested from RED triage
+            </p>
+            <ul className="mt-2 space-y-2">
+              {suggestions.map((a) => (
+                <li
+                  key={a.id}
+                  className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                >
+                  <span className="text-brand-800">
+                    <Badge tone="red">RED</Badge>{' '}
+                    <span className="ml-1">{suggestionReason(a)}</span>
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={pending}
+                    onClick={() => applySuggestion(a)}
+                  >
+                    Pre-fill referral
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
         <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
           <label className="text-sm">
             <span className="mb-1 block font-medium text-brand-800">Destination type</span>
@@ -157,11 +222,23 @@ export function ReferralsPanel({
               placeholder="Clinical reason for the referral"
             />
           </label>
-          <div className="sm:col-span-2">
+          <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
             <Button type="submit" disabled={pending}>
               {pending ? 'Saving…' : 'Raise referral'}
             </Button>
-            {error ? <span className="ml-3 text-sm text-rose-700">{error}</span> : null}
+            {sourceAssessmentId ? (
+              <span className="inline-flex items-center gap-1 text-xs text-brand-600">
+                Linked to a triage assessment
+                <button
+                  type="button"
+                  className="underline hover:text-brand-900"
+                  onClick={() => setSourceAssessmentId(null)}
+                >
+                  clear
+                </button>
+              </span>
+            ) : null}
+            {error ? <span className="text-sm text-rose-700">{error}</span> : null}
           </div>
         </form>
 
