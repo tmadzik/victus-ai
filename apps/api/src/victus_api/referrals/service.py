@@ -8,18 +8,23 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from victus_api.audit.service import write_audit
+from victus_api.config import Settings
 from victus_api.core.exceptions import NotFoundError
 from victus_api.db.models import (
     AuditAction,
+    NotificationType,
     Referral,
     ReferralStatus,
     User,
 )
+from victus_api.notifications.service import notify_user
 from victus_api.referrals.schemas import (
     CreateReferralRequest,
     ReferralResponse,
     UpdateReferralStatusRequest,
 )
+
+_REFERRALS_PATH = "/referrals"
 
 
 def _to_response(row: Referral) -> ReferralResponse:
@@ -43,6 +48,7 @@ async def create_referral(
     db: AsyncSession,
     *,
     actor: User,
+    settings: Settings,
     payload: CreateReferralRequest,
     ip_address: str | None,
     user_agent: str | None,
@@ -76,6 +82,30 @@ async def create_referral(
             "participant_id": str(payload.participant_user_id),
             "urgency": payload.urgency.value,
             "destination_type": payload.destination_type.value,
+        },
+    )
+
+    # Tell the participant they've been referred (in-app + best-effort webhook).
+    urgency_label = payload.urgency.value.capitalize()
+    await notify_user(
+        db,
+        settings=settings,
+        recipient_user_id=payload.participant_user_id,
+        type_=NotificationType.REFERRAL_RAISED,
+        title="You have a new referral",
+        body=(
+            f"Your care team referred you to {payload.destination_name} "
+            f"({urgency_label.lower()}). Reason: {payload.reason}"
+        ),
+        resource_path=_REFERRALS_PATH,
+        payload={
+            "referral_id": str(row.id),
+            "urgency": payload.urgency.value,
+            "destination_name": payload.destination_name,
+        },
+        webhook_fields={
+            "Urgency": urgency_label,
+            "Destination": payload.destination_name,
         },
     )
     return _to_response(row)
