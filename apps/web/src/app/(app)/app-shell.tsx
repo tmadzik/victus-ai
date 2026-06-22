@@ -5,8 +5,11 @@ import { usePathname } from 'next/navigation';
 
 import { UserRole } from '@victus/contracts';
 
+import { LanguageSwitcher } from '@/components/language-switcher';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import type { Locale } from '@/i18n/config';
+import type { Dictionary } from '@/i18n/dictionaries/en';
 import { cn } from '@/lib/utils';
 import { logoutAction } from '@/server/auth-actions';
 
@@ -22,27 +25,24 @@ type NavHref =
   | '/account/data'
   | '/admin/governance';
 
-const NAV: { href: NavHref; label: string }[] = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/triage', label: 'Pathway A — Triage' },
-  { href: '/toi', label: 'Pathway B — TOI' },
-  { href: '/history', label: 'History' },
-  { href: '/account/data', label: 'Data & erasure' },
+type NavKey = keyof Dictionary['nav'];
+type NavItem = { href: NavHref; key: NavKey };
+
+const NAV: NavItem[] = [
+  { href: '/dashboard', key: 'dashboard' },
+  { href: '/triage', key: 'triage' },
+  { href: '/toi', key: 'toi' },
+  { href: '/history', key: 'history' },
+  { href: '/account/data', key: 'data' },
 ];
 
 // Clinicians / admins can open any participant's identified record.
-const CLINICAL_NAV: { href: NavHref; label: string }[] = [
-  { href: '/clinical', label: 'Clinical' },
-];
+const CLINICAL_NAV: NavItem[] = [{ href: '/clinical', key: 'clinical' }];
 
 // Researchers (CHW / clinician / admin) get the labelled-data capture console.
-const RESEARCH_NAV: { href: NavHref; label: string }[] = [
-  { href: '/research', label: 'Research' },
-];
+const RESEARCH_NAV: NavItem[] = [{ href: '/research', key: 'research' }];
 
-const ADMIN_NAV: { href: NavHref; label: string }[] = [
-  { href: '/admin/governance', label: 'Admin' },
-];
+const ADMIN_NAV: NavItem[] = [{ href: '/admin/governance', key: 'admin' }];
 
 const RESEARCHER_ROLES: readonly UserRole[] = [
   UserRole.CHW,
@@ -53,10 +53,18 @@ const RESEARCHER_ROLES: readonly UserRole[] = [
 export function AppShell({
   user,
   unreadCount,
+  locale,
+  nav,
+  languageLabel,
+  previewNote,
   children,
 }: {
   user: { name: string; role: UserRole };
   unreadCount: number;
+  locale: Locale;
+  nav: Dictionary['nav'];
+  languageLabel: string;
+  previewNote: string;
   children: React.ReactNode;
 }): React.ReactElement {
   const pathname = usePathname();
@@ -70,6 +78,11 @@ export function AppShell({
 
   return (
     <div className="flex min-h-dvh flex-col">
+      {locale !== 'en' ? (
+        <div className="bg-brand-100 px-6 py-1.5 text-center text-xs text-brand-800">
+          {previewNote}
+        </div>
+      ) : null}
       <header className="border-b border-brand-100 bg-white">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <Link
@@ -94,12 +107,13 @@ export function AppShell({
                       : 'text-brand-700 hover:bg-brand-50 hover:text-brand-900',
                   )}
                 >
-                  {item.label}
+                  {nav[item.key]}
                 </Link>
               );
             })}
           </nav>
           <div className="flex items-center gap-3">
+            <LanguageSwitcher current={locale} label={languageLabel} />
             <NotificationBell initialCount={unreadCount} />
             <div className="hidden text-right text-xs leading-tight sm:block">
               <p className="font-medium text-brand-900">{user.name}</p>
@@ -107,7 +121,7 @@ export function AppShell({
             </div>
             <form action={logoutAction}>
               <Button type="submit" size="sm" variant="outline">
-                Sign out
+                {nav.signOut}
               </Button>
             </form>
           </div>

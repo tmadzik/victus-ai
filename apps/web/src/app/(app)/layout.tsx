@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 
+import { getI18n } from '@/i18n';
 import { apiClient } from '@/lib/api-client';
 import { auth } from '@/lib/auth';
 
@@ -28,6 +29,8 @@ export default async function AppLayout({
     unreadCount = 0;
   }
 
+  const { locale, dict } = await getI18n();
+
   return (
     <AppShell
       user={{
@@ -35,6 +38,10 @@ export default async function AppLayout({
         role: session.user.role,
       }}
       unreadCount={unreadCount}
+      locale={locale}
+      nav={dict.nav}
+      languageLabel={dict.language.label}
+      previewNote={dict.language.previewNote}
     >
       {children}
     </AppShell>

@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 
+import { getLocale } from '@/i18n';
+
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -24,13 +26,14 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
-}): React.ReactElement {
+}): Promise<React.ReactElement> {
+  const locale = await getLocale();
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <body className="min-h-dvh bg-brand-50 text-brand-950 antialiased">{children}</body>
     </html>
   );
