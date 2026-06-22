@@ -33,6 +33,10 @@ import {
   ParticipantHistorySchema,
   type ParticipantSummary,
   ParticipantSummarySchema,
+  type CreateReferral,
+  type ReferralResponse,
+  ReferralResponseSchema,
+  type UpdateReferralStatus,
   type RecordCalibrationRequest,
   type RegisterRequest,
   type ResearchCaseCreate,
@@ -594,6 +598,56 @@ export const apiClient = {
       { accessToken },
     );
     return AuditLogResponseSchema.parse(raw);
+  },
+
+  // ---- Referrals ----------------------------------------------------------
+
+  async createReferral(
+    accessToken: string,
+    payload: CreateReferral,
+  ): Promise<ReferralResponse> {
+    const raw = await request<unknown>('/referrals', {
+      method: 'POST',
+      accessToken,
+      body: payload,
+    });
+    return ReferralResponseSchema.parse(raw);
+  },
+
+  async listMyReferrals(accessToken: string, limit = 25): Promise<ReferralResponse[]> {
+    const raw = await request<unknown>(`/referrals/me?limit=${limit}`, { accessToken });
+    if (!Array.isArray(raw)) {
+      throw new ApiError(502, 'invalid_response', 'Expected array of referrals.');
+    }
+    return raw.map((item) => ReferralResponseSchema.parse(item));
+  },
+
+  async listParticipantReferrals(
+    accessToken: string,
+    userId: string,
+    limit = 50,
+  ): Promise<ReferralResponse[]> {
+    const raw = await request<unknown>(
+      `/referrals/participant/${userId}?limit=${limit}`,
+      { accessToken },
+    );
+    if (!Array.isArray(raw)) {
+      throw new ApiError(502, 'invalid_response', 'Expected array of referrals.');
+    }
+    return raw.map((item) => ReferralResponseSchema.parse(item));
+  },
+
+  async updateReferralStatus(
+    accessToken: string,
+    referralId: string,
+    payload: UpdateReferralStatus,
+  ): Promise<ReferralResponse> {
+    const raw = await request<unknown>(`/referrals/${referralId}/status`, {
+      method: 'PATCH',
+      accessToken,
+      body: payload,
+    });
+    return ReferralResponseSchema.parse(raw);
   },
 
   // ---- Clinician participant review ---------------------------------------
