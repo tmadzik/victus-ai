@@ -17,7 +17,7 @@ from sqlalchemy import func, update
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from tests.integration._helpers import register
+from tests.integration._helpers import register, unread_count
 from victus_api.db.models import User, UserRole
 
 pytestmark = pytest.mark.integration
@@ -65,6 +65,7 @@ def test_clinician_creates_and_participant_sees_it(client: Any) -> None:
     participant = register(client, "PATIENT")
     clinician = _clinician(client)
 
+    before = unread_count(client, participant["headers"])
     created = client.post(
         "/referrals",
         headers=clinician["headers"],
@@ -72,6 +73,9 @@ def test_clinician_creates_and_participant_sees_it(client: Any) -> None:
     )
     assert created.status_code == 201, created.text
     ref = created.json()
+
+    # The participant is notified of the new referral.
+    assert unread_count(client, participant["headers"]) == before + 1
     assert ref["status"] == "PENDING"
     assert ref["urgency"] == "URGENT"
     assert ref["created_by_user_id"] == clinician["id"]

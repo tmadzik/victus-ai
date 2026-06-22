@@ -11,6 +11,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request, status
 
+from victus_api.config import Settings, get_settings
 from victus_api.core.deps import CurrentUser, DbSession, require_role
 from victus_api.db.models import UserRole
 from victus_api.referrals.schemas import (
@@ -50,10 +51,11 @@ async def create_endpoint(
     user: ReferrerUser,
     request: Request,
     payload: CreateReferralRequest,
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> ReferralResponse:
     ip, ua = _client_metadata(request)
     return await create_referral(
-        db, actor=user, payload=payload, ip_address=ip, user_agent=ua
+        db, actor=user, settings=settings, payload=payload, ip_address=ip, user_agent=ua
     )
 
 
