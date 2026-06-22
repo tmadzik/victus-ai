@@ -1,0 +1,92 @@
+{
+  "feature_names": [
+    "rppg_hr_bpm",
+    "rppg_rr_bpm",
+    "rppg_hrv_rmssd_ms",
+    "rppg_hrv_sdnn_ms",
+    "snr_chrom_db",
+    "snr_pos_db",
+    "method_is_pos",
+    "fitzpatrick_ordinal"
+  ],
+  "hidden": 64,
+  "model_kind": "toi_corrector_v1",
+  "n_train": 5100,
+  "n_val": 900,
+  "residual_base_cols": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "scaler": {
+    "mean": [
+      78.51449584960938,
+      16.25799560546875,
+      43.12470245361328,
+      65.5199966430664,
+      3.703969717025757,
+      5.622737884521484,
+      0.8131372332572937,
+      4.173137187957764
+    ],
+    "std": [
+      13.59375286102295,
+      3.1209747791290283,
+      16.225845336914062,
+      22.13875961303711,
+      2.2499234676361084,
+      1.9658352136611938,
+      0.3897969126701355,
+      1.391013264656067
+    ]
+  },
+  "target_names": [
+    "hr_bpm",
+    "rr_bpm",
+    "hrv_rmssd_ms",
+    "hrv_sdnn_ms"
+  ],
+  "validation": {
+    "by_skin_tone": {
+      "III_IV": {
+        "corrected_bias_bpm": 0.173,
+        "corrected_loa_width_bpm": 15.062,
+        "corrected_mae_bpm": 2.946,
+        "n": 401,
+        "raw_bias_bpm": 4.436,
+        "raw_loa_width_bpm": 14.886,
+        "raw_mae_bpm": 4.814
+      },
+      "I_II": {
+        "corrected_bias_bpm": -1.898,
+        "corrected_loa_width_bpm": 7.798,
+        "corrected_mae_bpm": 2.277,
+        "n": 104,
+        "raw_bias_bpm": 1.492,
+        "raw_loa_width_bpm": 7.128,
+        "raw_mae_bpm": 1.817
+      },
+      "V_VI": {
+        "corrected_bias_bpm": 0.217,
+        "corrected_loa_width_bpm": 22.223,
+        "corrected_mae_bpm": 4.503,
+        "n": 395,
+        "raw_bias_bpm": 6.117,
+        "raw_loa_width_bpm": 22.35,
+        "raw_mae_bpm": 6.838
+      }
+    },
+    "overall": {
+      "corrected_bias_bpm": -0.047,
+      "corrected_loa_width_bpm": 18.2,
+      "corrected_mae_bpm": 3.552,
+      "n": 900,
+      "raw_bias_bpm": 4.834,
+      "raw_loa_width_bpm": 18.852,
+      "raw_mae_bpm": 5.356
+    },
+    "target": "hr_bpm"
+  },
+  "version": "1.0.0"
+}

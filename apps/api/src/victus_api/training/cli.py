@@ -371,6 +371,63 @@ def _run_multihead(args: argparse.Namespace, records: list[HarmonizedRecord], lo
     return 0
 
 
+def _run_toi_corrector(args: argparse.Namespace, log) -> int:  # noqa: ANN001
+    """Train + validate the Pathway B rPPG→reference biomarker corrector."""
+    from victus_api.training.toi_corrector import (
+        evaluate_corrector,
+        load_calibration_jsonl,
+        rows_to_matrix,
+        save_corrector_checkpoint,
+        split_rows,
+        synthesize_calibration_corpus,
+        train_corrector,
+    )
+
+    raw_rows: list[dict[str, object]] = []
+    if args.synth and args.synth > 0:
+        raw_rows.extend(synthesize_calibration_corpus(args.synth, seed=args.seed))
+    if args.calibration_jsonl:
+        real = load_calibration_jsonl(Path(args.calibration_jsonl))
+        raw_rows.extend(real)
+        log.info("toi_corrector_real_pairs", n=len(real))
+    if not raw_rows:
+        log.error("toi_corrector_no_data", hint="pass --synth N or --calibration-jsonl")
+        return 2
+
+    rows = rows_to_matrix(raw_rows)
+    train_rows, val_rows = split_rows(rows, val_frac=args.val_frac, seed=args.seed)
+    log.info("toi_corrector_split", train=len(train_rows), val=len(val_rows))
+
+    result = train_corrector(
+        train_rows, epochs=args.epochs, seed=args.seed
+    )
+    validation = evaluate_corrector(result, val_rows)
+
+    # Keep whatever directory the user gave; only swap the default triage
+    # filename for the corrector's. (Avoids doubling the path under cwd.)
+    output = args.output
+    if output.name == "triage_edl_v1.pt":
+        output = output.with_name("toi_corrector_v1.pt")
+    output = output.resolve()
+    save_corrector_checkpoint(
+        result,
+        output,
+        version=args.version,
+        validation=validation,
+        n_train=len(train_rows),
+        n_val=len(val_rows),
+    )
+    overall = validation["overall"]
+    log.info(
+        "toi_corrector_done",
+        checkpoint=str(output),
+        raw_mae=overall["raw_mae_bpm"],
+        corrected_mae=overall["corrected_mae_bpm"],
+    )
+    print(json.dumps({"checkpoint": str(output), "validation": validation}, indent=2))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Train the Pathway A EDL classifier.")
     parser.add_argument(
@@ -458,10 +515,37 @@ def main(argv: list[str] | None = None) -> int:
         "scale = (1 − E[p_y])^γ. 0 disables; 1.5–2.0 strongly down-weights easy examples.",
     )
 
+    # Pathway B — TOI biomarker corrector (separate training surface).
+    parser.add_argument(
+        "--toi-corrector",
+        action="store_true",
+        help="Train the Pathway B rPPG→reference biomarker corrector "
+        "(toi_corrector_v1) instead of the Pathway A classifier. Uses calibration "
+        "pairs (real export and/or synthetic bootstrap), not the triage datasets.",
+    )
+    parser.add_argument(
+        "--synth",
+        type=int,
+        default=6000,
+        help="TOI corrector: number of synthetic calibration pairs to bootstrap "
+        "with (0 to train only on --calibration-jsonl). Ignored without "
+        "--toi-corrector.",
+    )
+    parser.add_argument(
+        "--calibration-jsonl",
+        type=str,
+        default=None,
+        help="TOI corrector: path to a calibration export (JSONL of rPPG↔reference "
+        "pairs). Merged with any synthetic bootstrap.",
+    )
+
     args = parser.parse_args(argv)
 
     configure_logging(get_settings())
     log = get_logger("victus_api.training.cli")
+
+    if args.toi_corrector:
+        return _run_toi_corrector(args, log)
 
     log.info("loading_datasets", data_dir=str(args.data_dir))
     records = load_all(args.data_dir)
