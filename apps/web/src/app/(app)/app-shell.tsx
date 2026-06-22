@@ -17,6 +17,7 @@ type NavHref =
   | '/triage'
   | '/toi'
   | '/history'
+  | '/clinical'
   | '/research'
   | '/account/data'
   | '/admin/governance';
@@ -27,6 +28,11 @@ const NAV: { href: NavHref; label: string }[] = [
   { href: '/toi', label: 'Pathway B — TOI' },
   { href: '/history', label: 'History' },
   { href: '/account/data', label: 'Data & erasure' },
+];
+
+// Clinicians / admins can open any participant's identified record.
+const CLINICAL_NAV: { href: NavHref; label: string }[] = [
+  { href: '/clinical', label: 'Clinical' },
 ];
 
 // Researchers (CHW / clinician / admin) get the labelled-data capture console.
@@ -54,8 +60,10 @@ export function AppShell({
   children: React.ReactNode;
 }): React.ReactElement {
   const pathname = usePathname();
+  const isClinical = user.role === UserRole.CLINICIAN || user.role === UserRole.ADMIN;
   const navItems = [
     ...NAV,
+    ...(isClinical ? CLINICAL_NAV : []),
     ...(RESEARCHER_ROLES.includes(user.role) ? RESEARCH_NAV : []),
     ...(user.role === UserRole.ADMIN ? ADMIN_NAV : []),
   ];

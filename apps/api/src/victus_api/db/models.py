@@ -69,6 +69,8 @@ class AuditAction(str, enum.Enum):
     DATA_ACCESS_REQUEST_FULFILLED = "DATA_ACCESS_REQUEST_FULFILLED"
     ERASURE_REQUEST_APPROVED = "ERASURE_REQUEST_APPROVED"
     ERASURE_REQUEST_REJECTED = "ERASURE_REQUEST_REJECTED"
+    # A clinician/CHW searched for or opened a participant's identified record.
+    CLINICIAN_PARTICIPANT_VIEWED = "CLINICIAN_PARTICIPANT_VIEWED"
 
 
 class ErasureJurisdiction(str, enum.Enum):

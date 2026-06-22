@@ -1035,3 +1035,26 @@ export const ResearchCorpusStatsSchema = z.object({
   with_diabetes_marker: z.number().int().nonnegative(),
 });
 export type ResearchCorpusStats = z.infer<typeof ResearchCorpusStatsSchema>;
+
+// ===========================================================================
+// CLINICIAN PARTICIPANT REVIEW
+// ===========================================================================
+
+export const ParticipantSummarySchema = z.object({
+  user_id: z.string().uuid(),
+  email: z.string().nullable(),
+  full_name: z.string().nullable(),
+  role: z.string(),
+  is_active: z.boolean(),
+  triage_count: z.number().int().nonnegative(),
+  toi_count: z.number().int().nonnegative(),
+  last_activity: z.string().nullable(),
+});
+export type ParticipantSummary = z.infer<typeof ParticipantSummarySchema>;
+
+export const ParticipantHistorySchema = z.object({
+  participant: ParticipantSummarySchema,
+  triage: z.array(TriageAssessmentResponseSchema),
+  toi: z.array(ToiAssessmentResponseSchema),
+});
+export type ParticipantHistory = z.infer<typeof ParticipantHistorySchema>;
