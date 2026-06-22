@@ -16,6 +16,7 @@ type NavHref =
   | '/dashboard'
   | '/triage'
   | '/toi'
+  | '/history'
   | '/research'
   | '/account/data'
   | '/admin/governance';
@@ -24,6 +25,7 @@ const NAV: { href: NavHref; label: string }[] = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/triage', label: 'Pathway A — Triage' },
   { href: '/toi', label: 'Pathway B — TOI' },
+  { href: '/history', label: 'History' },
   { href: '/account/data', label: 'Data & erasure' },
 ];
 
