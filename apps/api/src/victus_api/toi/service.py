@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
 from typing import Any
 
 import numpy as np
@@ -24,6 +25,7 @@ from victus_api.db.models import (
 from victus_api.db.models import (
     ToiQuality as DbToiQuality,
 )
+from victus_api.toi.corrector import get_corrector
 from victus_api.toi.schemas import (
     BiomarkerEstimate,
     SignalQuality,
@@ -66,6 +68,7 @@ async def assess_toi(
         lighting_score_client=payload.lighting_score,
         face_presence_ratio=payload.face_presence_ratio,
     )
+    pipeline = _maybe_apply_corrector(pipeline, payload)
 
     biomarkers_dto = _build_biomarker_dto(pipeline)
     signal_quality = SignalQuality(
@@ -192,6 +195,47 @@ async def list_assessments_for_user(
 
 
 # --- Helpers -----------------------------------------------------------------
+
+
+def _maybe_apply_corrector(
+    pipeline: PipelineOutput, payload: ToiAssessmentRequest
+) -> PipelineOutput:
+    """Apply the env-gated biomarker corrector, if one is configured.
+
+    No-op when ``VICTUS_TOI_CORRECTOR_PATH`` is unset (the default), on POOR-quality
+    captures (we do not "correct" signal that never cleared the floor), or when the
+    pipeline recovered no heart rate. The correction is recorded under
+    ``method_details["corrector"]`` so a reviewer can see the raw-vs-corrected
+    provenance; ``signal_quality`` is left untouched.
+    """
+    corrector = get_corrector()
+    if (
+        corrector is None
+        or pipeline.quality == ToiQuality.POOR.value
+        or pipeline.heart_rate_bpm is None
+    ):
+        return pipeline
+
+    corrected = corrector.correct(pipeline, payload.skin_tone_estimate)
+    details = {
+        **pipeline.method_details,
+        "corrector": {
+            "applied": True,
+            "model_kind": corrected.model_kind,
+            "model_version": corrected.model_version,
+            "raw_heart_rate_bpm": pipeline.heart_rate_bpm,
+        },
+    }
+    return replace(
+        pipeline,
+        heart_rate_bpm=corrected.heart_rate_bpm,
+        heart_rate_ci=corrected.heart_rate_ci,
+        respiratory_rate_bpm=corrected.respiratory_rate_bpm,
+        respiratory_rate_ci=corrected.respiratory_rate_ci,
+        hrv_rmssd_ms=corrected.hrv_rmssd_ms,
+        hrv_sdnn_ms=corrected.hrv_sdnn_ms,
+        method_details=details,
+    )
 
 
 def _build_biomarker_dto(
