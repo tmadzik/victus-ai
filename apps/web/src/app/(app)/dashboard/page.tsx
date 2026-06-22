@@ -6,6 +6,7 @@ import { type ConsentType, PathwayKind, userMayEnterPathway } from '@victus/cont
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { getI18n } from '@/i18n';
 import { apiClient } from '@/lib/api-client';
 import { auth } from '@/lib/auth';
 
@@ -23,6 +24,9 @@ export default async function DashboardPage({
 }): Promise<React.ReactElement> {
   const session = await auth();
   if (!session?.user) redirect('/login');
+
+  const { dict } = await getI18n();
+  const d = dict.dashboard;
 
   const params = await searchParams;
   const blocker = params.blocked_by ? REASON_COPY[params.blocked_by] : null;
@@ -42,20 +46,17 @@ export default async function DashboardPage({
     <div className="space-y-8">
       <header>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-700">
-          Choose a pathway
+          {d.eyebrow}
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-brand-950">
-          Welcome, {session.user.name ?? 'clinician'}
+          {d.welcome}, {session.user.name ?? 'clinician'}
         </h1>
-        <p className="mt-2 max-w-2xl text-brand-700">
-          Select an assessment pathway. Pathway A surfaces NCD risk with explicit
-          uncertainty; Pathway B captures rPPG biomarkers via the camera.
-        </p>
+        <p className="mt-2 max-w-2xl text-brand-700">{d.intro}</p>
       </header>
 
       {blocker ? (
         <Alert tone="warning">
-          <AlertTitle>Access blocked</AlertTitle>
+          <AlertTitle>{d.accessBlocked}</AlertTitle>
           <AlertDescription>
             {blocker}{' '}
             {params.pathway ? <span className="font-semibold">({params.pathway})</span> : null}
@@ -65,14 +66,16 @@ export default async function DashboardPage({
 
       <section className="grid gap-6 sm:grid-cols-2">
         <PathwayCard
-          title="Pathway A — 3B-Triage"
-          description="Non-clinical NCD risk via tape-measure + symptom audit. Evidential network outputs GREEN / YELLOW / RED with calibrated uncertainty."
+          title={d.pathwayA.title}
+          description={d.pathwayA.description}
+          startLabel={d.startSession}
           href="/triage"
           decision={a}
         />
         <PathwayCard
-          title="Pathway B — TOI"
-          description="Camera-based rPPG biomarkers (HR, RR, BP, HRV, Stress, CVD risk) optimized for Fitzpatrick III–VI via CHROM / POS."
+          title={d.pathwayB.title}
+          description={d.pathwayB.description}
+          startLabel={d.startSession}
           href="/toi"
           decision={b}
         />
@@ -94,11 +97,13 @@ function describe(
 function PathwayCard({
   title,
   description,
+  startLabel,
   href,
   decision,
 }: {
   title: string;
   description: string;
+  startLabel: string;
   href: '/triage' | '/toi';
   decision: ReturnType<typeof userMayEnterPathway>;
 }): React.ReactElement {
@@ -112,7 +117,7 @@ function PathwayCard({
       <CardContent>
         {enabled ? (
           <Button asChild>
-            <Link href={href}>Start session</Link>
+            <Link href={href}>{startLabel}</Link>
           </Button>
         ) : decision.reason === 'consent' ? (
           <GrantConsentButton
