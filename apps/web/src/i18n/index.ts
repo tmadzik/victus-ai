@@ -4,10 +4,14 @@ import { cookies } from 'next/headers';
 
 import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, type Locale } from './config';
 import { type Dictionary, en } from './dictionaries/en';
+import { ha } from './dictionaries/ha';
+import { ig } from './dictionaries/ig';
 import { nd } from './dictionaries/nd';
+import { pcm } from './dictionaries/pcm';
 import { sn } from './dictionaries/sn';
+import { yo } from './dictionaries/yo';
 
-const DICTIONARIES: Record<Locale, Dictionary> = { en, sn, nd };
+const DICTIONARIES: Record<Locale, Dictionary> = { en, sn, nd, yo, ig, ha, pcm };
 
 /** Resolve the active locale from the cookie (server components only). */
 export async function getLocale(): Promise<Locale> {
