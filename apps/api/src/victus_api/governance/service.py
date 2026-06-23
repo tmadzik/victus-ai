@@ -45,6 +45,7 @@ from victus_api.governance.anonymiser import (
     tombstone_email,
     tombstone_name,
 )
+from victus_api.governance.jurisdictions import jurisdiction_for_site
 from victus_api.governance.schemas import (
     AnonymiseSubjectRequest,
     DataInventoryCounts,
@@ -353,11 +354,14 @@ async def erase_account_self_service(
         raise GovernanceError(
             "Confirm-email does not match the account email; erasure not performed.",
         )
+    # The participant's regime follows their enrolment site (e.g. NG → NDPA);
+    # the request's value is only the fallback for an unmapped site.
+    jurisdiction = jurisdiction_for_site(user.site_code, fallback=payload.jurisdiction)
     return await _apply_account_erasure(
         db,
         actor_user=user,
         target_user=user,
-        jurisdiction=payload.jurisdiction,
+        jurisdiction=jurisdiction,
         request_basis=payload.request_basis,
         notes=payload.notes,
         settings=settings,
