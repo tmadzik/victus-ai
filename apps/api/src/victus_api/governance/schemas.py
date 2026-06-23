@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 class ErasureJurisdiction(str, enum.Enum):
     GDPR = "GDPR"
     POPIA = "POPIA"
+    NDPA = "NDPA"  # Nigeria Data Protection Act 2023 (regulator: NDPC)
     OTHER = "OTHER"
 
 
