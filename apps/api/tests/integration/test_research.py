@@ -115,6 +115,8 @@ def test_corpus_stats_and_export(client: Any) -> None:
     assert body["total"] >= 1
     assert body["with_diabetes_marker"] >= 1
     assert set(body["label_distribution"]) == {"obesity", "hypertension", "diabetes"}
+    # Site dimension is stratifiable (default site when SITE_CODE is unset).
+    assert sum(body["by_site"].values()) == body["total"]
 
     ex = client.get("/research/triage-cases/export", headers=user["headers"])
     assert ex.status_code == 200, ex.text
@@ -126,4 +128,5 @@ def test_corpus_stats_and_export(client: Any) -> None:
         "hypertension_label",
         "diabetes_label",
         "domain",
+        "site",
     } <= set(row)

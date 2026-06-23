@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     api_port: int = 8000
     api_log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
 
+    # Deployment site / country for this instance (e.g. "ZW", "NG"). Each pilot
+    # runs as its own deployment; new participants and research cases are stamped
+    # with it for residency partitioning and per-site analytics/calibration.
+    site_code: str = Field(default="DEFAULT", max_length=16)
+
     database_url: str = Field(
         default="postgresql+asyncpg://victus:victus_dev_only_change_me@localhost:5432/victus",
         description="Async SQLAlchemy DSN (asyncpg).",

@@ -192,6 +192,11 @@ class User(Base):
         server_default=UserRole.PATIENT.value,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    # Deployment site / country this participant was enrolled under (e.g. "ZW",
+    # "NG"). Stamped at registration from the instance's configured site_code.
+    site_code: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="DEFAULT", index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -1119,6 +1124,11 @@ class ResearchTriageCase(Base):
     # "CLINICAL_GRADE" | "CHW_TAPE_MEASURE" — measurement provenance (DANN domain).
     capture_domain: Mapped[str] = mapped_column(
         String(32), nullable=False, server_default="CLINICAL_GRADE"
+    )
+    # Deployment site / country (e.g. "ZW", "NG") — lets the training corpus be
+    # stratified by geography for per-site calibration / domain adaptation.
+    site_code: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="DEFAULT", index=True
     )
 
     # --- measured inputs (the model features) ---

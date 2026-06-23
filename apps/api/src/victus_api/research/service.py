@@ -159,6 +159,7 @@ async def create_research_case(
         created_by_user_id=created_by.id,
         study_subject_id=payload.study_subject_id,
         capture_domain=payload.capture_domain.value,
+        site_code=created_by.site_code,
         age_years=payload.age_years,
         sex=payload.sex.value,
         height_cm=payload.height_cm,
@@ -240,6 +241,7 @@ async def export_training_rows(db: AsyncSession) -> list[dict[str, object]]:
         {
             "source": "research",
             "domain": r.capture_domain,
+            "site": r.site_code,
             "age_years": r.age_years,
             "sex": r.sex,
             "height_cm": r.height_cm,
@@ -266,6 +268,7 @@ async def corpus_stats(db: AsyncSession) -> ResearchCorpusStats:
     return ResearchCorpusStats(
         total=len(rows),
         by_domain=dict(Counter(r.capture_domain for r in rows)),
+        by_site=dict(Counter(r.site_code for r in rows)),
         label_distribution=LabelDistribution(
             obesity=_dist("obesity_label"),
             hypertension=_dist("hypertension_label"),

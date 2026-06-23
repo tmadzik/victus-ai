@@ -84,6 +84,7 @@ export default async function ResearchPage(): Promise<React.ReactElement> {
 
 function Dashboard({ stats }: { stats: ResearchCorpusStats }): React.ReactElement {
   const domainEntries = Object.entries(stats.by_domain);
+  const siteEntries = Object.entries(stats.by_site);
   return (
     <section className="grid gap-4 lg:grid-cols-[repeat(3,minmax(0,1fr))]">
       <Card className="lg:col-span-3">
@@ -91,7 +92,7 @@ function Dashboard({ stats }: { stats: ResearchCorpusStats }): React.ReactElemen
           <CardTitle className="text-lg">Corpus snapshot</CardTitle>
         </CardHeader>
         <CardContent>
-          <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             <Metric label="Total cases" value={String(stats.total)} />
             <Metric label="With BP reading" value={String(stats.with_bp)} />
             <Metric label="With glucose marker" value={String(stats.with_diabetes_marker)} />
@@ -101,6 +102,14 @@ function Dashboard({ stats }: { stats: ResearchCorpusStats }): React.ReactElemen
                 domainEntries.length === 0
                   ? '—'
                   : domainEntries.map(([k, v]) => `${k.split('_')[0]} ${v}`).join(' · ')
+              }
+            />
+            <Metric
+              label="Sites"
+              value={
+                siteEntries.length === 0
+                  ? '—'
+                  : siteEntries.map(([k, v]) => `${k} ${v}`).join(' · ')
               }
             />
           </dl>

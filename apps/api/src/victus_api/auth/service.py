@@ -54,6 +54,7 @@ async def register_user(
         full_name=payload.full_name,
         role=payload.role,
         is_active=True,
+        site_code=settings.site_code,
     )
     db.add(user)
     await db.flush()
