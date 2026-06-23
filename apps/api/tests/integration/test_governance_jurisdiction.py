@@ -48,8 +48,10 @@ def test_nigeria_site_records_ndpa(client: Any) -> None:
     assert _erase(client, "NG")["jurisdiction"] == "NDPA"
 
 
-def test_zimbabwe_site_records_popia(client: Any) -> None:
-    assert _erase(client, "ZW")["jurisdiction"] == "POPIA"
+def test_zimbabwe_site_records_cdpa(client: Any) -> None:
+    # A ZW participant is governed by Zimbabwe's Cyber and Data Protection Act
+    # [Ch 12:07], not South Africa's POPIA.
+    assert _erase(client, "ZW")["jurisdiction"] == "CDPA"
 
 
 def test_unmapped_site_keeps_requested_jurisdiction(client: Any) -> None:
