@@ -13,8 +13,8 @@ from victus_api.db.models import ErasureJurisdiction
 # Site codes are the per-instance `settings.site_code` stamped onto each User.
 _SITE_JURISDICTION: dict[str, ErasureJurisdiction] = {
     "NG": ErasureJurisdiction.NDPA,   # Nigeria Data Protection Act 2023 (NDPC)
-    "ZA": ErasureJurisdiction.POPIA,  # South Africa
-    "ZW": ErasureJurisdiction.POPIA,  # Zimbabwe pilot — POPIA-modelled regime
+    "ZA": ErasureJurisdiction.POPIA,  # South Africa — POPIA
+    "ZW": ErasureJurisdiction.CDPA,   # Zimbabwe — Cyber & Data Protection Act [Ch 12:07] (POTRAZ)
 }
 
 

@@ -714,6 +714,7 @@ export const ErasureJurisdiction = {
   GDPR: 'GDPR',
   POPIA: 'POPIA',
   NDPA: 'NDPA', // Nigeria Data Protection Act 2023 (regulator: NDPC)
+  CDPA: 'CDPA', // Zimbabwe Cyber and Data Protection Act [Ch 12:07] (POTRAZ)
   OTHER: 'OTHER',
 } as const;
 export type ErasureJurisdiction =

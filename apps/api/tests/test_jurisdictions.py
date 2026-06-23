@@ -13,12 +13,21 @@ def test_nigeria_maps_to_ndpa() -> None:
     )
 
 
-def test_southern_africa_maps_to_popia() -> None:
-    for site in ("ZW", "ZA", "zw", " ng "):  # case/whitespace-insensitive
-        assert jurisdiction_for_site(site, fallback=ErasureJurisdiction.OTHER) in {
-            ErasureJurisdiction.POPIA,
-            ErasureJurisdiction.NDPA,
-        }
+def test_zimbabwe_maps_to_cdpa() -> None:
+    # Zimbabwe is governed by the Cyber and Data Protection Act [Ch 12:07],
+    # not South Africa's POPIA.
+    for site in ("ZW", "zw", " zw "):  # case/whitespace-insensitive
+        assert (
+            jurisdiction_for_site(site, fallback=ErasureJurisdiction.OTHER)
+            == ErasureJurisdiction.CDPA
+        )
+
+
+def test_south_africa_maps_to_popia() -> None:
+    assert (
+        jurisdiction_for_site("ZA", fallback=ErasureJurisdiction.OTHER)
+        == ErasureJurisdiction.POPIA
+    )
 
 
 def test_unknown_or_missing_site_uses_fallback() -> None:
