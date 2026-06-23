@@ -19,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useDictionary } from '@/i18n/context';
 
 interface RawForm {
   height_cm: string;
@@ -89,6 +90,8 @@ export function AssessmentForm({
   onSubmit: (inputs: TapeMeasureInputs) => void;
   isPending: boolean;
 }): React.ReactElement {
+  const dict = useDictionary();
+  const t = dict.triage.form;
   const [raw, setRaw] = useState<RawForm>(EMPTY);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof RawForm, string>>>(
     {},
@@ -103,7 +106,7 @@ export function AssessmentForm({
     const result = parseRaw(raw);
     if (!result.ok) {
       setFieldErrors(result.fieldErrors);
-      setFormError('Please correct the highlighted fields before continuing.');
+      setFormError(t.fixFields);
       return;
     }
     setFieldErrors({});
@@ -114,22 +117,19 @@ export function AssessmentForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Step 1 · Tape-measure inputs</CardTitle>
-        <CardDescription>
-          Anthropometrics in centimetres and kilograms. Blood pressure is optional
-          but improves classification when available.
-        </CardDescription>
+        <CardTitle>{t.title}</CardTitle>
+        <CardDescription>{t.description}</CardDescription>
       </CardHeader>
       <CardContent>
         {formError ? (
           <Alert tone="danger" className="mb-4">
-            <AlertTitle>Form needs attention</AlertTitle>
+            <AlertTitle>{t.needsAttention}</AlertTitle>
             <AlertDescription>{formError}</AlertDescription>
           </Alert>
         ) : null}
 
         <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
-          <Field label="Height (cm)" id="height_cm" error={fieldErrors.height_cm}>
+          <Field label={t.height} id="height_cm" error={fieldErrors.height_cm}>
             <Input
               id="height_cm"
               type="number"
@@ -142,7 +142,7 @@ export function AssessmentForm({
               onChange={update('height_cm')}
             />
           </Field>
-          <Field label="Weight (kg)" id="weight_kg" error={fieldErrors.weight_kg}>
+          <Field label={t.weight} id="weight_kg" error={fieldErrors.weight_kg}>
             <Input
               id="weight_kg"
               type="number"
@@ -155,7 +155,7 @@ export function AssessmentForm({
               onChange={update('weight_kg')}
             />
           </Field>
-          <Field label="Waist (cm)" id="waist_cm" error={fieldErrors.waist_cm}>
+          <Field label={t.waist} id="waist_cm" error={fieldErrors.waist_cm}>
             <Input
               id="waist_cm"
               type="number"
@@ -168,7 +168,7 @@ export function AssessmentForm({
               onChange={update('waist_cm')}
             />
           </Field>
-          <Field label="Hip (cm, optional)" id="hip_cm" error={fieldErrors.hip_cm}>
+          <Field label={t.hip} id="hip_cm" error={fieldErrors.hip_cm}>
             <Input
               id="hip_cm"
               type="number"
@@ -180,7 +180,7 @@ export function AssessmentForm({
               onChange={update('hip_cm')}
             />
           </Field>
-          <Field label="Age (years)" id="age_years" error={fieldErrors.age_years}>
+          <Field label={t.age} id="age_years" error={fieldErrors.age_years}>
             <Input
               id="age_years"
               type="number"
@@ -193,7 +193,7 @@ export function AssessmentForm({
               onChange={update('age_years')}
             />
           </Field>
-          <Field label="Sex" id="sex" error={fieldErrors.sex}>
+          <Field label={t.sex} id="sex" error={fieldErrors.sex}>
             <select
               id="sex"
               required
@@ -201,14 +201,14 @@ export function AssessmentForm({
               onChange={update('sex')}
               className="flex h-10 w-full rounded-[var(--radius-control)] border border-brand-200 bg-white px-3 py-2 text-sm text-brand-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
             >
-              <option value="">Select…</option>
-              <option value={Sex.MALE}>Male</option>
-              <option value={Sex.FEMALE}>Female</option>
-              <option value={Sex.OTHER}>Other</option>
+              <option value="">{t.select}</option>
+              <option value={Sex.MALE}>{t.male}</option>
+              <option value={Sex.FEMALE}>{t.female}</option>
+              <option value={Sex.OTHER}>{t.other}</option>
             </select>
           </Field>
           <Field
-            label="Systolic BP (mmHg, optional)"
+            label={t.systolic}
             id="systolic_bp_mmhg"
             error={fieldErrors.systolic_bp_mmhg}
           >
@@ -224,7 +224,7 @@ export function AssessmentForm({
             />
           </Field>
           <Field
-            label="Diastolic BP (mmHg, optional)"
+            label={t.diastolic}
             id="diastolic_bp_mmhg"
             error={fieldErrors.diastolic_bp_mmhg}
           >
@@ -242,7 +242,7 @@ export function AssessmentForm({
 
           <div className="sm:col-span-2 mt-2 flex justify-end">
             <Button type="submit" size="lg" disabled={isPending}>
-              {isPending ? 'Working…' : 'Continue to symptom audit'}
+              {isPending ? t.working : t.continue}
             </Button>
           </div>
         </form>

@@ -19,6 +19,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { useDictionary } from '@/i18n/context';
 
 const SAFETY_LABELS: Record<SafetyOverrideSymptomKey, string> = {
   polydipsia_unquenchable_thirst:
@@ -53,6 +54,7 @@ export function SymptomAuditForm({
   onBack: () => void;
   isPending: boolean;
 }): React.ReactElement {
+  const t = useDictionary().triage.symptoms;
   const [safety, setSafety] = useState<Set<SafetyOverrideSymptomKey>>(new Set());
   const [contextual, setContextual] = useState<Set<ContextualSymptomKey>>(new Set());
 
@@ -82,7 +84,7 @@ export function SymptomAuditForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Step 2 · Symptom audit</CardTitle>
+        <CardTitle>{t.title}</CardTitle>
         <CardDescription>
           Any item in the first group triggers an immediate clinical referral
           regardless of the network&apos;s prediction. Be honest: this is the
@@ -92,7 +94,7 @@ export function SymptomAuditForm({
       <CardContent className="space-y-6">
         {safety.size > 0 ? (
           <Alert tone="danger">
-            <AlertTitle>This will trigger RED</AlertTitle>
+            <AlertTitle>{t.triggersRed}</AlertTitle>
             <AlertDescription>
               {safety.size} red-flag symptom{safety.size === 1 ? '' : 's'} selected.
               The clinical-referral pathway will engage on submit.
@@ -131,10 +133,10 @@ export function SymptomAuditForm({
 
         <div className="flex justify-between pt-2">
           <Button variant="outline" onClick={onBack} disabled={isPending}>
-            Back
+            {t.back}
           </Button>
           <Button onClick={submit} size="lg" disabled={isPending}>
-            {isPending ? 'Submitting…' : 'Run triage assessment'}
+            {isPending ? t.submitting : t.run}
           </Button>
         </div>
       </CardContent>

@@ -14,6 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { useDictionary } from '@/i18n/context';
 import { CaptureBuffer } from '@/lib/rppg/capture-buffer';
 import {
   extractForeheadRoi,
@@ -42,6 +43,7 @@ export function CaptureStep({
   onCaptureEnd?: () => void;
   disabled: boolean;
 }): React.ReactElement {
+  const cap = useDictionary().toi.capture;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -272,7 +274,7 @@ export function CaptureStep({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Capture</CardTitle>
+        <CardTitle>{cap.title}</CardTitle>
         <CardDescription>
           Position your face squarely in the frame. A green box marks the
           forehead ROI; keep it stable for the full {TARGET_DURATION_S} seconds.
@@ -281,7 +283,7 @@ export function CaptureStep({
       <CardContent className="space-y-4">
         {errorMessage ? (
           <Alert tone="danger">
-            <AlertTitle>Capture error</AlertTitle>
+            <AlertTitle>{cap.error}</AlertTitle>
             <AlertDescription>{errorMessage}</AlertDescription>
           </Alert>
         ) : null}
@@ -309,7 +311,7 @@ export function CaptureStep({
         {state === 'capturing' && progress ? (
           <div>
             <div className="mb-2 flex justify-between text-xs">
-              <span className="font-semibold text-brand-900">Capturing…</span>
+              <span className="font-semibold text-brand-900">{cap.capturing}</span>
               <span className="font-mono text-brand-700">
                 {progress.sampleCount} frames
               </span>
@@ -345,7 +347,7 @@ export function CaptureStep({
               variant="outline"
               disabled={disabled}
             >
-              Use demo signal
+              {cap.useDemoSignal}
             </Button>
           ) : null}
           {state !== 'capturing' ? (
@@ -355,10 +357,10 @@ export function CaptureStep({
               disabled={!landmarkerReady || disabled || state === 'preparing'}
             >
               {state === 'preparing'
-                ? 'Preparing camera…'
+                ? cap.preparing
                 : !landmarkerReady
-                  ? 'Loading face landmarker…'
-                  : 'Start 30-second capture'}
+                  ? cap.loadingLandmarker
+                  : cap.start}
             </Button>
           ) : null}
         </div>

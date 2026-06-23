@@ -11,12 +11,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { useDictionary } from '@/i18n/context';
 
 export function ConsentStep({
   onContinue,
 }: {
   onContinue: () => void;
 }): React.ReactElement {
+  const c = useDictionary().toi.consent;
   const [isSecure, setIsSecure] = useState(true);
   const [hasMediaDevices, setHasMediaDevices] = useState(true);
   const [permission, setPermission] =
@@ -59,7 +61,7 @@ export function ConsentStep({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Set up your capture environment</CardTitle>
+        <CardTitle>{c.setupTitle}</CardTitle>
         <CardDescription>
           A 30-second facial video is processed entirely on the server. No
           frames are stored — only per-frame mean RGB over a forehead ROI is
@@ -69,7 +71,7 @@ export function ConsentStep({
       <CardContent className="space-y-5">
         {!isSecure ? (
           <Alert tone="danger">
-            <AlertTitle>HTTPS required</AlertTitle>
+            <AlertTitle>{c.httpsRequired}</AlertTitle>
             <AlertDescription>
               The browser MediaStream API only works on{' '}
               <code className="font-mono">https://</code> or{' '}
@@ -81,7 +83,7 @@ export function ConsentStep({
 
         {isSecure && !hasMediaDevices ? (
           <Alert tone="danger">
-            <AlertTitle>Camera API unavailable</AlertTitle>
+            <AlertTitle>{c.cameraUnavailable}</AlertTitle>
             <AlertDescription>
               <code className="font-mono">navigator.mediaDevices.getUserMedia</code>{' '}
               is not supported in this browser. Use a recent Chrome, Safari, or
@@ -119,7 +121,7 @@ export function ConsentStep({
         />
 
         <Alert tone="info">
-          <AlertTitle>Capture instructions</AlertTitle>
+          <AlertTitle>{c.instructionsTitle}</AlertTitle>
           <AlertDescription>
             Sit still under even, indirect lighting. Avoid backlight, fans, and
             phone notifications during the 30-second window. Look straight at
@@ -133,7 +135,7 @@ export function ConsentStep({
               onClick={requestPermission}
               disabled={!isSecure || !hasMediaDevices || permission === 'requesting'}
             >
-              {permission === 'requesting' ? 'Requesting…' : 'Request camera access'}
+              {permission === 'requesting' ? c.requesting : c.requestAccess}
             </Button>
           ) : (
             <Button onClick={onContinue} disabled={!canContinue}>

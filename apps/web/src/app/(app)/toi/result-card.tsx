@@ -9,6 +9,7 @@ import { ToiQuality } from '@victus/contracts';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useDictionary } from '@/i18n/context';
 import {
   Card,
   CardContent,
@@ -42,6 +43,7 @@ export function ResultCard({
   assessment: ToiAssessmentResponse;
   onRestart: () => void;
 }): React.ReactElement {
+  const r = useDictionary().toi.result;
   const quality = QUALITY_TONE[assessment.quality];
   const sq = assessment.signal_quality;
 
@@ -69,7 +71,7 @@ export function ResultCard({
         <CardContent className="space-y-6">
           {assessment.quality === ToiQuality.POOR ? (
             <Alert tone="danger">
-              <AlertTitle>Recapture required</AlertTitle>
+              <AlertTitle>{r.recaptureRequired}</AlertTitle>
               <AlertDescription>
                 Signal quality fell below the acceptable floor.{' '}
                 {assessment.warnings.length > 0
@@ -91,7 +93,7 @@ export function ResultCard({
           {assessment.warnings.length > 0 &&
           assessment.quality !== ToiQuality.POOR ? (
             <Alert tone="warning">
-              <AlertTitle>Capture warnings</AlertTitle>
+              <AlertTitle>{r.warnings}</AlertTitle>
               <AlertDescription>
                 <ul className="list-disc space-y-1 pl-5">
                   {assessment.warnings.map((w) => (
@@ -114,7 +116,7 @@ export function ResultCard({
             })}
           </p>
           <Button onClick={onRestart} variant="outline" size="sm">
-            Start a new capture
+            {r.restart}
           </Button>
         </CardFooter>
       </Card>
