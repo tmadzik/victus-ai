@@ -45,7 +45,11 @@ from victus_api.governance.anonymiser import (
     tombstone_email,
     tombstone_name,
 )
-from victus_api.governance.jurisdictions import jurisdiction_for_site
+from victus_api.governance.jurisdictions import (
+    jurisdiction_for_site,
+    retention_basis,
+    retention_policy_summary,
+)
 from victus_api.governance.schemas import (
     AnonymiseSubjectRequest,
     DataInventoryCounts,
@@ -108,17 +112,6 @@ async def _notify_checkers_of_pending(
     )
 
 
-RETENTION_POLICY_SUMMARY = (
-    "On erasure, your PII (email, name, password) is tombstoned and your "
-    "study subjects are anonymised via salted SHA-256. De-identified "
-    "biometric records (triage assessments, TOI assessments, calibration "
-    "pairs) are retained for research integrity under GDPR Article "
-    "17(3)(d) / POPIA section 14(3) since they no longer identify you. "
-    "Audit-log rows referencing your historical user_id are preserved as "
-    "regulatory evidence that the erasure was honoured."
-)
-
-
 class GovernanceError(VictusError):
     status_code = 400
     error_code = "governance_error"
@@ -167,7 +160,7 @@ async def _create_account_erasure_request(
         request_basis=DbErasureBasis(request_basis.value),
         status=DbErasureStatus(initial_status.value),
         statutory_retention_applied=True,
-        retention_basis=RETENTION_POLICY_SUMMARY,
+        retention_basis=retention_basis(jurisdiction),
         notes=notes,
         requires_approval=requires_approval,
     )
@@ -291,7 +284,7 @@ async def _execute_account_erasure(
             "subjects_anonymised": len(subject_rows),
             "whatsapp_jobs_scrubbed": jobs_scrubbed,
             "whatsapp_sessions_deleted": sessions_deleted,
-            "retention_basis": "GDPR_17_3_d_POPIA_14_3_research",
+            "retention_basis": retention_basis(request_row.jurisdiction),
         },
     )
 
@@ -408,7 +401,7 @@ async def _create_subject_anonymisation_request(
         request_basis=DbErasureBasis(request_basis.value),
         status=DbErasureStatus(initial_status.value),
         statutory_retention_applied=True,
-        retention_basis=RETENTION_POLICY_SUMMARY,
+        retention_basis=retention_basis(jurisdiction),
         notes=notes,
         requires_approval=requires_approval,
     )
@@ -609,6 +602,12 @@ async def my_data_summary(
 ) -> MyDataSummary:
     counts = await _count_data(db, user_id=user.id)
 
+    # The retention summary cites the law of the participant's enrolment site
+    # (ZW → Cyber and Data Protection Act, NG → NDPA, …), not a foreign regime.
+    jurisdiction = jurisdiction_for_site(
+        user.site_code, fallback=ErasureJurisdiction.GDPR
+    )
+
     await write_audit(
         db,
         action=AuditAction.DATA_ACCESS_REQUEST_FULFILLED,
@@ -628,7 +627,7 @@ async def my_data_summary(
         created_at=user.created_at,
         erased_at=user.erased_at,
         counts=counts,
-        retention_policy_summary=RETENTION_POLICY_SUMMARY,
+        retention_policy_summary=retention_policy_summary(jurisdiction),
     )
 
 
