@@ -1083,8 +1083,10 @@ export type ReferralStatus = (typeof ReferralStatus)[keyof typeof ReferralStatus
 
 export const ReferralDestinationType = {
   VICTUS_FACILITY: 'VICTUS_FACILITY',
+  PRIMARY_HEALTH_CENTRE: 'PRIMARY_HEALTH_CENTRE',
   PUBLIC_CLINIC: 'PUBLIC_CLINIC',
   HOSPITAL: 'HOSPITAL',
+  TEACHING_HOSPITAL: 'TEACHING_HOSPITAL',
   OTHER: 'OTHER',
 } as const;
 export type ReferralDestinationType =
@@ -1092,10 +1094,32 @@ export type ReferralDestinationType =
 
 export const REFERRAL_DESTINATION_LABELS: Record<ReferralDestinationType, string> = {
   VICTUS_FACILITY: 'Victus facility',
+  PRIMARY_HEALTH_CENTRE: 'Primary health centre',
   PUBLIC_CLINIC: 'Public clinic',
   HOSPITAL: 'Hospital',
+  TEACHING_HOSPITAL: 'Teaching hospital',
   OTHER: 'Other',
 };
+
+/**
+ * Which destination types a clinician may pick, by deployment site. Victus owns
+ * facilities in Zimbabwe; elsewhere referrals flow into the public health system,
+ * so VICTUS_FACILITY is not offered. Unknown sites get the full generic set.
+ */
+export function referralDestinationsForSite(
+  siteCode: string,
+): ReferralDestinationType[] {
+  const generic: ReferralDestinationType[] = [
+    'PUBLIC_CLINIC',
+    'PRIMARY_HEALTH_CENTRE',
+    'HOSPITAL',
+    'TEACHING_HOSPITAL',
+    'OTHER',
+  ];
+  if (siteCode === 'NG') return generic;
+  if (siteCode === 'ZW') return ['VICTUS_FACILITY', ...generic];
+  return ['VICTUS_FACILITY', ...generic];
+}
 
 export const CreateReferralSchema = z.object({
   participant_user_id: z.string().uuid(),

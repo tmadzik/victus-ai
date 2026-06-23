@@ -88,6 +88,7 @@ export default async function ParticipantRecordPage({
 
       <ReferralsPanel
         participantId={userId}
+        siteCode={p.site_code}
         referrals={referrals}
         suggestions={suggestions}
       />
