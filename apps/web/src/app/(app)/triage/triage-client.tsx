@@ -9,6 +9,7 @@ import type {
 } from '@victus/contracts';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useDictionary } from '@/i18n/context';
 
 import { AssessmentForm } from './assessment-form';
 import { SymptomAuditForm } from './symptom-audit-form';
@@ -18,6 +19,7 @@ import { assessTriageAction } from '@/server/triage-actions';
 type Step = 'inputs' | 'symptoms' | 'result';
 
 export function TriageClient(): React.ReactElement {
+  const dict = useDictionary();
   const [step, setStep] = useState<Step>('inputs');
   const [inputs, setInputs] = useState<TapeMeasureInputs | null>(null);
   const [assessment, setAssessment] = useState<TriageAssessmentResponse | null>(null);
@@ -55,7 +57,7 @@ export function TriageClient(): React.ReactElement {
       <StepIndicator step={step} />
       {serverError ? (
         <Alert tone="danger">
-          <AlertTitle>Submission failed</AlertTitle>
+          <AlertTitle>{dict.triage.submissionFailed}</AlertTitle>
           <AlertDescription>{serverError}</AlertDescription>
         </Alert>
       ) : null}
@@ -80,10 +82,11 @@ export function TriageClient(): React.ReactElement {
 }
 
 function StepIndicator({ step }: { step: Step }): React.ReactElement {
+  const dict = useDictionary();
   const steps: { key: Step; label: string }[] = [
-    { key: 'inputs', label: 'Inputs' },
-    { key: 'symptoms', label: 'Symptom audit' },
-    { key: 'result', label: 'Result' },
+    { key: 'inputs', label: dict.triage.steps.inputs },
+    { key: 'symptoms', label: dict.triage.steps.symptoms },
+    { key: 'result', label: dict.triage.steps.result },
   ];
   const activeIndex = steps.findIndex((s) => s.key === step);
   return (

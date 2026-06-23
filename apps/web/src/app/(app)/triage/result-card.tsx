@@ -11,6 +11,7 @@ import {
 } from '@victus/contracts';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useDictionary } from '@/i18n/context';
 import { TriageStateBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -70,6 +71,7 @@ export function TriageResultCard({
   assessment: TriageAssessmentResponse;
   onRestart: () => void;
 }): React.ReactElement {
+  const tr = useDictionary().triage.result;
   const isFallback = assessment.model_kind.startsWith('rule_based');
   const isOverride = assessment.safety_override_triggered;
   const isDann = assessment.model_kind.includes('dann');
@@ -86,7 +88,7 @@ export function TriageResultCard({
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-700">
                 Pathway A · Result
               </p>
-              <CardTitle className="mt-1 text-2xl">Per-disease risk profile</CardTitle>
+              <CardTitle className="mt-1 text-2xl">{tr.title}</CardTitle>
               <CardDescription>
                 Obesity, hypertension and diabetes are weighted{' '}
                 <span className="font-semibold text-brand-900">independently</span>.
@@ -202,7 +204,7 @@ export function TriageResultCard({
             })}
           </p>
           <Button onClick={onRestart} variant="outline" size="sm">
-            Start a new assessment
+            {tr.restart}
           </Button>
         </CardFooter>
       </Card>

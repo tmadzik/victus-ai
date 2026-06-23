@@ -5,6 +5,7 @@ import { useCallback, useState, useTransition } from 'react';
 import type { RppgFrame, ToiAssessmentResponse } from '@victus/contracts';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useDictionary } from '@/i18n/context';
 
 import { CaptureStep } from './capture-step';
 import { ConsentStep } from './consent-step';
@@ -23,6 +24,7 @@ export interface CompletedCapture {
 }
 
 export function ToiClient(): React.ReactElement {
+  const dict = useDictionary();
   const [step, setStep] = useState<Step>('consent');
   const [error, setError] = useState<string | null>(null);
   const [assessment, setAssessment] = useState<ToiAssessmentResponse | null>(null);
@@ -70,7 +72,7 @@ export function ToiClient(): React.ReactElement {
 
       {error ? (
         <Alert tone="danger">
-          <AlertTitle>Capture failed</AlertTitle>
+          <AlertTitle>{dict.toi.captureFailed}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
@@ -83,7 +85,7 @@ export function ToiClient(): React.ReactElement {
 
       {step === 'processing' ? (
         <Alert tone="info">
-          <AlertTitle>Analysing signal…</AlertTitle>
+          <AlertTitle>{dict.toi.analysing}</AlertTitle>
           <AlertDescription>
             Server-side CHROM and POS pipelines are running on the captured
             frame series. This typically takes 1–3 seconds.
@@ -99,11 +101,12 @@ export function ToiClient(): React.ReactElement {
 }
 
 function StepIndicator({ step }: { step: Step }): React.ReactElement {
+  const s = useDictionary().toi.steps;
   const steps: { key: Step; label: string }[] = [
-    { key: 'consent', label: 'Setup' },
-    { key: 'capture', label: 'Capture' },
-    { key: 'processing', label: 'Analyse' },
-    { key: 'result', label: 'Result' },
+    { key: 'consent', label: s.setup },
+    { key: 'capture', label: s.capture },
+    { key: 'processing', label: s.analyse },
+    { key: 'result', label: s.result },
   ];
   const activeIndex = steps.findIndex((s) => s.key === step);
   return (
