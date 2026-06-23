@@ -91,6 +91,34 @@ def _derive_diabetes(hba1c: float | None, fpg: float | None) -> _DerivedLabel:
     return None, ""
 
 
+_HBA1C_VARIANT_CAVEAT = (
+    "HbA1c can be unreliable where haemoglobin variants (HbS / HbC, common in "
+    "West Africa) are present — corroborate with fasting glucose or an OGTT."
+)
+
+
+def _diabetes_caveat(
+    hba1c: float | None, fpg: float | None, override: RiskClass | None
+) -> str | None:
+    """Flag (do not change) a diabetes label that leans on HbA1c in a population
+    where haemoglobin variants distort it. Returns a caveat string or None."""
+    if override is not None or hba1c is None:
+        return None
+    if fpg is None:
+        # HbA1c is the sole marker — no glucose corroboration.
+        return _HBA1C_VARIANT_CAVEAT
+    # Both present: surface a discordance the HbA1c-preferring derivation hides.
+    hb_cat, _ = _derive_diabetes(hba1c, None)
+    fpg_cat, _ = _derive_diabetes(None, fpg)
+    if hb_cat is not None and fpg_cat is not None and hb_cat != fpg_cat:
+        return (
+            f"HbA1c and fasting glucose disagree ({hb_cat.value} vs "
+            f"{fpg_cat.value}) — consider an OGTT / repeat; HbA1c may be "
+            "confounded by haemoglobin variants."
+        )
+    return None
+
+
 def _resolve(
     override: RiskClass | None, derived: _DerivedLabel, *, missing_msg: str
 ) -> tuple[RiskClass, str]:
@@ -121,6 +149,11 @@ async def create_research_case(
         _derive_diabetes(payload.hba1c_percent, payload.fasting_glucose_mmol_l),
         missing_msg="Diabetes label needs HbA1c or fasting glucose, or an explicit override.",
     )
+    caveat = _diabetes_caveat(
+        payload.hba1c_percent, payload.fasting_glucose_mmol_l, payload.diabetes_label
+    )
+    if caveat:
+        basis["diabetes_caveat"] = caveat
 
     row = ResearchTriageCase(
         created_by_user_id=created_by.id,

@@ -68,6 +68,8 @@ def test_clinician_records_with_derived_labels(client: Any) -> None:
     assert d["hypertension_label"] == "HIGH_RISK"
     assert d["diabetes_label"] == "HIGH_RISK"
     assert "HbA1c 7.2" in d["label_basis"]["diabetes"]
+    # West-Africa safeguard: an HbA1c-only diabetes label carries a variant caveat.
+    assert "haemoglobin variants" in d["label_basis"]["diabetes_caveat"]
 
     # Refuses to guess diabetes/hypertension without a marker.
     bad = {"age_years": 40, "sex": "MALE", "height_cm": 170, "weight_kg": 80, "waist_cm": 90}
@@ -79,6 +81,27 @@ def test_clinician_records_with_derived_labels(client: Any) -> None:
     ro = client.post("/research/triage-cases", headers=user["headers"], json=override)
     assert ro.status_code == 201, ro.text
     assert ro.json()["label_basis"]["diabetes"] == "clinician-set"
+
+
+def test_hba1c_variant_caveat(client: Any) -> None:
+    user = register(client, "PATIENT")
+    asyncio.run(_promote(user["email"], UserRole.CLINICIAN))
+    base = {
+        "age_years": 50, "sex": "MALE", "height_cm": 175, "weight_kg": 80,
+        "waist_cm": 95, "systolic_bp_mmhg": 118, "diastolic_bp_mmhg": 76,
+    }
+
+    # HbA1c + a corroborating fasting glucose, both in the diabetes range -> no caveat.
+    concordant = {**base, "hba1c_percent": 7.2, "fasting_glucose_mmol_l": 8.0}
+    rc = client.post("/research/triage-cases", headers=user["headers"], json=concordant)
+    assert rc.status_code == 201, rc.text
+    assert "diabetes_caveat" not in rc.json()["label_basis"]
+
+    # HbA1c says diabetes, fasting glucose says normal -> discordance caveat.
+    discordant = {**base, "hba1c_percent": 7.2, "fasting_glucose_mmol_l": 5.0}
+    rd = client.post("/research/triage-cases", headers=user["headers"], json=discordant)
+    assert rd.status_code == 201, rd.text
+    assert "disagree" in rd.json()["label_basis"]["diabetes_caveat"]
 
 
 def test_corpus_stats_and_export(client: Any) -> None:
