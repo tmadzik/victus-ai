@@ -19,6 +19,7 @@ class ParticipantSummary(BaseModel):
     full_name: str | None
     role: str
     is_active: bool
+    site_code: str
     triage_count: int
     toi_count: int
     last_activity: datetime | None

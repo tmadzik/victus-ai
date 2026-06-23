@@ -55,6 +55,7 @@ async def _summary(db: AsyncSession, user: User) -> ParticipantSummary:
         full_name=user.full_name,
         role=user.role.value,
         is_active=user.is_active,
+        site_code=user.site_code,
         triage_count=triage_n,
         toi_count=toi_n,
         last_activity=last_activity,

@@ -96,6 +96,7 @@ class ResearchCorpusStats(BaseModel):
 
     total: int
     by_domain: dict[str, int]
+    by_site: dict[str, int]
     label_distribution: LabelDistribution
     with_bp: int
     with_diabetes_marker: int

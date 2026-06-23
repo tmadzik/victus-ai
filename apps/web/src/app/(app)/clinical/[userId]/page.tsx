@@ -76,7 +76,7 @@ export default async function ParticipantRecordPage({
             {p.full_name ?? 'Unnamed participant'}
           </h1>
           <p className="mt-1 text-sm text-brand-600">
-            {p.email ?? '—'} · {p.role}
+            {p.email ?? '—'} · {p.role} · site {p.site_code}
             {p.is_active ? '' : ' · inactive'}
           </p>
         </div>

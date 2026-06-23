@@ -90,6 +90,7 @@ export default async function ClinicalPage({
                 <tr>
                   <th className="px-4 py-3">Participant</th>
                   <th className="px-4 py-3">Role</th>
+                  <th className="px-4 py-3">Site</th>
                   <th className="px-4 py-3">Triage</th>
                   <th className="px-4 py-3">TOI</th>
                   <th className="px-4 py-3">Last activity</th>
@@ -106,6 +107,7 @@ export default async function ClinicalPage({
                       <div className="text-xs text-brand-600">{p.email ?? '—'}</div>
                     </td>
                     <td className="px-4 py-3 text-brand-700">{p.role}</td>
+                    <td className="px-4 py-3 font-mono text-brand-700">{p.site_code}</td>
                     <td className="px-4 py-3 font-mono text-brand-900">{p.triage_count}</td>
                     <td className="px-4 py-3 font-mono text-brand-900">{p.toi_count}</td>
                     <td className="px-4 py-3 text-xs text-brand-600">

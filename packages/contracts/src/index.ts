@@ -1027,6 +1027,7 @@ export type ResearchCaseResponse = z.infer<typeof ResearchCaseResponseSchema>;
 export const ResearchCorpusStatsSchema = z.object({
   total: z.number().int().nonnegative(),
   by_domain: z.record(z.string(), z.number()),
+  by_site: z.record(z.string(), z.number()),
   label_distribution: z.object({
     obesity: z.record(z.string(), z.number()),
     hypertension: z.record(z.string(), z.number()),
@@ -1047,6 +1048,7 @@ export const ParticipantSummarySchema = z.object({
   full_name: z.string().nullable(),
   role: z.string(),
   is_active: z.boolean(),
+  site_code: z.string(),
   triage_count: z.number().int().nonnegative(),
   toi_count: z.number().int().nonnegative(),
   last_activity: z.string().nullable(),
