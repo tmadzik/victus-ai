@@ -713,6 +713,7 @@ export type EndSessionRequest = z.infer<typeof EndSessionRequestSchema>;
 export const ErasureJurisdiction = {
   GDPR: 'GDPR',
   POPIA: 'POPIA',
+  NDPA: 'NDPA', // Nigeria Data Protection Act 2023 (regulator: NDPC)
   OTHER: 'OTHER',
 } as const;
 export type ErasureJurisdiction =
