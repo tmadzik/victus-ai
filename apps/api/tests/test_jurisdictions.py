@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from victus_api.db.models import ErasureJurisdiction
-from victus_api.governance.jurisdictions import jurisdiction_for_site
+from victus_api.governance.jurisdictions import (
+    jurisdiction_for_site,
+    retention_basis,
+    retention_policy_summary,
+)
 
 
 def test_nigeria_maps_to_ndpa() -> None:
@@ -43,3 +47,36 @@ def test_unknown_or_missing_site_uses_fallback() -> None:
         jurisdiction_for_site("", fallback=ErasureJurisdiction.OTHER)
         == ErasureJurisdiction.OTHER
     )
+
+
+def test_zimbabwe_retention_cites_cdpa_and_health_professions_act() -> None:
+    # The ZW participant summary must cite Zimbabwe's own law and the clinician
+    # confidentiality duty — never POPIA.
+    summary = retention_policy_summary(ErasureJurisdiction.CDPA)
+    assert "Cyber and Data Protection Act [Chapter 12:07]" in summary
+    assert "POTRAZ" in summary
+    assert "Health Professions Act [Chapter 27:19]" in summary
+    assert "POPIA" not in summary
+
+    basis = retention_basis(ErasureJurisdiction.CDPA)
+    assert "Cyber and Data Protection Act [Chapter 12:07]" in basis
+    # The short basis is stored in a String(500) column.
+    assert len(basis) <= 500
+
+
+def test_retention_basis_is_jurisdiction_specific() -> None:
+    assert "GDPR" in retention_basis(ErasureJurisdiction.GDPR)
+    assert "POPIA" in retention_basis(ErasureJurisdiction.POPIA)
+    assert "Nigeria Data Protection Act" in retention_basis(ErasureJurisdiction.NDPA)
+    # No regime leaks a foreign statute into another's citation.
+    assert "POPIA" not in retention_basis(ErasureJurisdiction.NDPA)
+    assert "POPIA" not in retention_basis(ErasureJurisdiction.GDPR)
+
+
+def test_non_zimbabwe_summaries_omit_health_professions_note() -> None:
+    for j in (
+        ErasureJurisdiction.GDPR,
+        ErasureJurisdiction.POPIA,
+        ErasureJurisdiction.NDPA,
+    ):
+        assert "Health Professions Act" not in retention_policy_summary(j)

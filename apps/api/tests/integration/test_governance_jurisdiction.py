@@ -57,3 +57,17 @@ def test_zimbabwe_site_records_cdpa(client: Any) -> None:
 def test_unmapped_site_keeps_requested_jurisdiction(client: Any) -> None:
     # An unmapped site falls back to the request's value (GDPR here).
     assert _erase(client, "DEFAULT")["jurisdiction"] == "GDPR"
+
+
+def test_zimbabwe_data_summary_cites_cdpa(client: Any) -> None:
+    # The /account/data retention summary for a ZW participant cites Zimbabwe's
+    # own law and the clinician confidentiality duty, not POPIA.
+    user = register(client, "PATIENT")
+    asyncio.run(_set_site(user["email"], "ZW"))
+    r = client.get("/governance/my-data-summary", headers=user["headers"])
+    assert r.status_code == 200, r.text
+    summary = r.json()["retention_policy_summary"]
+    assert "Cyber and Data Protection Act [Chapter 12:07]" in summary
+    assert "POTRAZ" in summary
+    assert "Health Professions Act [Chapter 27:19]" in summary
+    assert "POPIA" not in summary
