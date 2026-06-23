@@ -1193,8 +1193,10 @@ class ReferralStatus(str, enum.Enum):
 
 class ReferralDestinationType(str, enum.Enum):
     VICTUS_FACILITY = "VICTUS_FACILITY"
+    PRIMARY_HEALTH_CENTRE = "PRIMARY_HEALTH_CENTRE"  # public PHC (e.g. Nigeria)
     PUBLIC_CLINIC = "PUBLIC_CLINIC"
     HOSPITAL = "HOSPITAL"
+    TEACHING_HOSPITAL = "TEACHING_HOSPITAL"  # tertiary referral hospital
     OTHER = "OTHER"
 
 

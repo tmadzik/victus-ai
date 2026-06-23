@@ -8,6 +8,7 @@ import {
   DISEASE_LABELS,
   REFERRAL_DESTINATION_LABELS,
   type ReferralDestinationType,
+  referralDestinationsForSite,
   type ReferralResponse,
   type ReferralStatus,
   ReferralUrgency,
@@ -22,12 +23,6 @@ import {
   updateReferralStatusAction,
 } from '@/server/referral-actions';
 
-const DEST_TYPES: ReferralDestinationType[] = [
-  'VICTUS_FACILITY',
-  'PUBLIC_CLINIC',
-  'HOSPITAL',
-  'OTHER',
-];
 const URGENCIES: ReferralUrgency[] = ['ROUTINE', 'URGENT', 'EMERGENCY'];
 
 const STATUS_TONE: Record<string, BadgeProps['tone']> = {
@@ -73,19 +68,23 @@ function suggestionReason(a: TriageAssessmentResponse): string {
 
 export function ReferralsPanel({
   participantId,
+  siteCode,
   referrals,
   suggestions,
 }: {
   participantId: string;
+  // Participant's deployment site — gates which destination types are offered.
+  siteCode: string;
   referrals: ReferralResponse[];
   // RED triage assessments not yet linked to a referral — offered as pre-fills.
   suggestions: TriageAssessmentResponse[];
 }): React.ReactElement {
   const router = useRouter();
+  const destTypes = referralDestinationsForSite(siteCode);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [destinationType, setDestinationType] =
-    useState<ReferralDestinationType>('VICTUS_FACILITY');
+    useState<ReferralDestinationType>(destTypes[0] ?? 'PUBLIC_CLINIC');
   const [destinationName, setDestinationName] = useState('');
   const [urgency, setUrgency] = useState<ReferralUrgency>(ReferralUrgency.ROUTINE);
   const [reason, setReason] = useState('');
@@ -180,7 +179,7 @@ export function ReferralsPanel({
                 setDestinationType(e.target.value as ReferralDestinationType)
               }
             >
-              {DEST_TYPES.map((t) => (
+              {destTypes.map((t) => (
                 <option key={t} value={t}>
                   {REFERRAL_DESTINATION_LABELS[t]}
                 </option>
