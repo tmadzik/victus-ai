@@ -6,3 +6,31 @@
 
 /* Tailwind must scan the shared component sources for class names. */
 @source '../../../../packages/ui/src';
+
+/* --- Print-to-PDF: isolate a `.print-summary` block so the browser's
+   Save-as-PDF produces a clean one-page result with no app chrome. --- */
+.print-only {
+  display: none;
+}
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-summary,
+  .print-summary * {
+    visibility: visible;
+  }
+  .print-summary {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    padding: 0;
+  }
+  /* Controls (buttons) inside the summary are not part of the document. */
+  .print-hide {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+}
