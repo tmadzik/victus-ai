@@ -27,7 +27,7 @@ export function ActiveSessionBanner({
         Subject {session.external_subject_id}
         <span className="text-xs text-brand-600">
           · started{' '}
-          {new Date(session.session_started_at).toLocaleString('en-ZA', {
+          {new Date(session.session_started_at).toLocaleString('en-GB', {
             dateStyle: 'short',
             timeStyle: 'short',
           })}

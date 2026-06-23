@@ -9,7 +9,7 @@ import { ToiQuality } from '@victus/contracts';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useDictionary } from '@/i18n/context';
+import { useDictionary, useFormatLocale } from '@/i18n/context';
 import {
   Card,
   CardContent,
@@ -44,6 +44,7 @@ export function ResultCard({
   onRestart: () => void;
 }): React.ReactElement {
   const r = useDictionary().toi.result;
+  const fmtLoc = useFormatLocale();
   const quality = QUALITY_TONE[assessment.quality];
   const sq = assessment.signal_quality;
 
@@ -116,7 +117,7 @@ export function ResultCard({
           <p className="text-xs text-brand-600">
             Assessment <code className="font-mono">{assessment.id.slice(0, 8)}…</code>{' '}
             recorded at{' '}
-            {new Date(assessment.created_at).toLocaleString('en-ZA', {
+            {new Date(assessment.created_at).toLocaleString(fmtLoc, {
               dateStyle: 'medium',
               timeStyle: 'short',
             })}

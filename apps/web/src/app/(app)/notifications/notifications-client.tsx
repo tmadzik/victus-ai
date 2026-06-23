@@ -18,6 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { useFormatLocale } from '@/i18n/context';
 import { emitNotificationsUpdated } from '@/lib/notifications-events';
 import { cn } from '@/lib/utils';
 import {
@@ -41,6 +42,7 @@ export function NotificationsClient({
   initialList: NotificationListResponse;
 }): React.ReactElement {
   const router = useRouter();
+  const fmtLoc = useFormatLocale();
   const [items, setItems] = useState<NotificationResponse[]>(
     initialList.notifications,
   );
@@ -142,7 +144,7 @@ export function NotificationsClient({
                       </div>
                       <p className="mt-0.5 text-sm text-brand-700">{n.body}</p>
                       <p className="mt-1 text-xs text-brand-500">
-                        {new Date(n.created_at).toLocaleString('en-ZA', {
+                        {new Date(n.created_at).toLocaleString(fmtLoc, {
                           dateStyle: 'medium',
                           timeStyle: 'short',
                         })}

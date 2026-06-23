@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 
 import { AssessmentTimeline, fmtDate } from '@/components/assessment-timeline';
 import { Button } from '@/components/ui/button';
+import { formatLocale } from '@/i18n/config';
+import { getLocale } from '@/i18n';
 import { ApiError, apiClient } from '@/lib/api-client';
 import { auth } from '@/lib/auth';
 
@@ -28,8 +30,10 @@ export default async function HistoryPage(): Promise<React.ReactElement> {
     safeList(apiClient.listMyToiAssessments(session.accessToken, 50)),
   ]);
 
+  const formatLoc = formatLocale(await getLocale());
   const times = [...triage, ...toi].map((a) => new Date(a.created_at).getTime());
-  const lastActivity = times.length > 0 ? fmtDate(new Date(Math.max(...times)).toISOString()) : '—';
+  const lastActivity =
+    times.length > 0 ? fmtDate(new Date(Math.max(...times)).toISOString(), formatLoc) : '—';
 
   return (
     <div className="space-y-8">
@@ -67,6 +71,7 @@ export default async function HistoryPage(): Promise<React.ReactElement> {
       <AssessmentTimeline
         triage={triage}
         toi={toi}
+        formatLoc={formatLoc}
         emptyHint={
           <>
             No assessments yet. Start with a{' '}

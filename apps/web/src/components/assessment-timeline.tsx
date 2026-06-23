@@ -29,18 +29,24 @@ const BIOMARKER_LABEL: Record<string, string> = {
   stress_index: 'Stress',
 };
 
-export function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' });
+export function fmtDate(iso: string, formatLocale = 'en-GB'): string {
+  return new Date(iso).toLocaleString(formatLocale, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
 }
 
 export function AssessmentTimeline({
   triage,
   toi,
   emptyHint,
+  formatLoc = 'en-GB',
 }: {
   triage: TriageAssessmentResponse[];
   toi: ToiAssessmentResponse[];
   emptyHint?: React.ReactNode;
+  /** BCP-47 tag for date formatting (en-ZW / en-NG), from the active locale. */
+  formatLoc?: string;
 }): React.ReactElement {
   const entries: TimelineEntry[] = [
     ...triage.map((data) => ({
@@ -76,9 +82,9 @@ export function AssessmentTimeline({
             }`}
           />
           {entry.kind === 'triage' ? (
-            <TriageEntry data={entry.data} />
+            <TriageEntry data={entry.data} formatLoc={formatLoc} />
           ) : (
-            <ToiEntry data={entry.data} />
+            <ToiEntry data={entry.data} formatLoc={formatLoc} />
           )}
         </li>
       ))}
@@ -86,7 +92,13 @@ export function AssessmentTimeline({
   );
 }
 
-function TriageEntry({ data }: { data: TriageAssessmentResponse }): React.ReactElement {
+function TriageEntry({
+  data,
+  formatLoc,
+}: {
+  data: TriageAssessmentResponse;
+  formatLoc: string;
+}): React.ReactElement {
   const trained = data.model_kind.startsWith('trained');
   return (
     <Card className="border-l-4 border-l-brand-500">
@@ -97,7 +109,7 @@ function TriageEntry({ data }: { data: TriageAssessmentResponse }): React.ReactE
             <TriageStateBadge state={data.overall_state} />
             {data.safety_override_triggered ? <Badge tone="red">Safety override</Badge> : null}
           </div>
-          <time className="text-xs text-brand-600">{fmtDate(data.created_at)}</time>
+          <time className="text-xs text-brand-600">{fmtDate(data.created_at, formatLoc)}</time>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -143,7 +155,13 @@ function TriageEntry({ data }: { data: TriageAssessmentResponse }): React.ReactE
   );
 }
 
-function ToiEntry({ data }: { data: ToiAssessmentResponse }): React.ReactElement {
+function ToiEntry({
+  data,
+  formatLoc,
+}: {
+  data: ToiAssessmentResponse;
+  formatLoc: string;
+}): React.ReactElement {
   const q = QUALITY_TONE[data.quality];
   const markers = Object.entries(data.biomarkers);
   return (
@@ -154,7 +172,7 @@ function ToiEntry({ data }: { data: ToiAssessmentResponse }): React.ReactElement
             <Badge tone="brand">Pathway B — TOI</Badge>
             <Badge tone={q.tone}>{q.label}</Badge>
           </div>
-          <time className="text-xs text-brand-600">{fmtDate(data.created_at)}</time>
+          <time className="text-xs text-brand-600">{fmtDate(data.created_at, formatLoc)}</time>
         </div>
 
         {markers.length > 0 ? (

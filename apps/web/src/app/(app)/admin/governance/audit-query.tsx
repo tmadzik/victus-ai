@@ -173,7 +173,7 @@ function AuditTable({
           {entries.map((e) => (
             <tr key={e.id} className="border-b border-brand-100 align-top">
               <td className="py-2 pr-4 font-mono text-xs text-brand-700">
-                {new Date(e.created_at).toLocaleString('en-ZA')}
+                {new Date(e.created_at).toLocaleString('en-GB')}
               </td>
               <td className="py-2 pr-4 font-mono text-xs text-brand-700">
                 {e.actor_email ?? e.actor_id ?? '—'}

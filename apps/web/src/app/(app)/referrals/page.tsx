@@ -8,6 +8,8 @@ import {
 
 import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { formatLocale } from '@/i18n/config';
+import { getLocale } from '@/i18n';
 import { ApiError, apiClient } from '@/lib/api-client';
 import { auth } from '@/lib/auth';
 
@@ -29,6 +31,7 @@ export default async function ReferralsPage(): Promise<React.ReactElement> {
   const session = await auth();
   if (!session?.user) redirect('/login?reason=session_expired');
 
+  const formatLoc = formatLocale(await getLocale());
   let referrals: ReferralResponse[] = [];
   let error: string | null = null;
   try {
@@ -82,7 +85,7 @@ export default async function ReferralsPage(): Promise<React.ReactElement> {
                       </span>
                     </div>
                     <time className="text-xs text-brand-600">
-                      {new Date(r.created_at).toLocaleDateString('en-ZA', {
+                      {new Date(r.created_at).toLocaleDateString(formatLoc, {
                         dateStyle: 'medium',
                       })}
                     </time>
