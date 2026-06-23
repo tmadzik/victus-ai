@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation';
 import { type ParticipantSummary, UserRole } from '@victus/contracts';
 
 import { Card, CardContent } from '@/components/ui/card';
+import { formatLocale } from '@/i18n/config';
+import { getLocale } from '@/i18n';
 import { ApiError, apiClient } from '@/lib/api-client';
 import { auth } from '@/lib/auth';
 
@@ -22,6 +24,7 @@ export default async function ClinicalPage({
 
   const { q } = await searchParams;
   const query = (q ?? '').trim();
+  const formatLoc = formatLocale(await getLocale());
 
   let results: ParticipantSummary[] | null = null;
   let error: string | null = null;
@@ -112,7 +115,7 @@ export default async function ClinicalPage({
                     <td className="px-4 py-3 font-mono text-brand-900">{p.toi_count}</td>
                     <td className="px-4 py-3 text-xs text-brand-600">
                       {p.last_activity
-                        ? new Date(p.last_activity).toLocaleDateString('en-ZA', {
+                        ? new Date(p.last_activity).toLocaleDateString(formatLoc, {
                             dateStyle: 'medium',
                           })
                         : '—'}

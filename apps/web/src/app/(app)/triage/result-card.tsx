@@ -11,7 +11,7 @@ import {
 } from '@victus/contracts';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useDictionary } from '@/i18n/context';
+import { useDictionary, useFormatLocale } from '@/i18n/context';
 import { TriageStateBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -72,6 +72,7 @@ export function TriageResultCard({
   onRestart: () => void;
 }): React.ReactElement {
   const tr = useDictionary().triage.result;
+  const fmtLoc = useFormatLocale();
   const isFallback = assessment.model_kind.startsWith('rule_based');
   const isOverride = assessment.safety_override_triggered;
   const isDann = assessment.model_kind.includes('dann');
@@ -204,7 +205,7 @@ export function TriageResultCard({
           <p className="text-xs text-brand-600">
             Assessment <code className="font-mono">{assessment.id.slice(0, 8)}…</code>{' '}
             recorded at{' '}
-            {new Date(assessment.created_at).toLocaleString('en-ZA', {
+            {new Date(assessment.created_at).toLocaleString(fmtLoc, {
               dateStyle: 'medium',
               timeStyle: 'short',
             })}

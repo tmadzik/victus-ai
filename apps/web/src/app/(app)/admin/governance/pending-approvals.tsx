@@ -114,7 +114,7 @@ export function PendingApprovals({
                     return (
                       <tr key={r.id} className="border-b border-brand-100 align-top">
                         <td className="py-2 pr-4 font-mono text-xs text-brand-700">
-                          {new Date(r.requested_at).toLocaleString('en-ZA')}
+                          {new Date(r.requested_at).toLocaleString('en-GB')}
                         </td>
                         <td className="py-2 pr-4 font-mono text-xs text-brand-900">
                           {r.requesting_actor_email ?? '—'}

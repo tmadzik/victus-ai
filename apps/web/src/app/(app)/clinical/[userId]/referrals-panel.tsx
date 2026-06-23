@@ -18,6 +18,7 @@ import {
 import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useFormatLocale } from '@/i18n/context';
 import {
   createReferralAction,
   updateReferralStatusAction,
@@ -48,7 +49,7 @@ const INPUT_CLASS =
   'w-full rounded-[var(--radius-control)] border border-brand-200 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500';
 
 function suggestionDate(a: TriageAssessmentResponse): string {
-  return new Date(a.created_at).toLocaleDateString('en-ZA', { dateStyle: 'medium' });
+  return new Date(a.created_at).toLocaleDateString('en-GB', { dateStyle: 'medium' });
 }
 
 // A RED triage assessment implies an urgent referral; a safety override (the
@@ -80,6 +81,7 @@ export function ReferralsPanel({
   suggestions: TriageAssessmentResponse[];
 }): React.ReactElement {
   const router = useRouter();
+  const fmtLoc = useFormatLocale();
   const destTypes = referralDestinationsForSite(siteCode);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -264,7 +266,7 @@ export function ReferralsPanel({
                     </span>
                   </div>
                   <time className="text-xs text-brand-600">
-                    {new Date(r.created_at).toLocaleDateString('en-ZA', {
+                    {new Date(r.created_at).toLocaleDateString(fmtLoc, {
                       dateStyle: 'medium',
                     })}
                   </time>

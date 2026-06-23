@@ -20,6 +20,27 @@ export const LOCALE_AUTONYM: Record<Locale, string> = {
 };
 
 /**
+ * BCP-47 tag used for date/number formatting. Follows the participant's pilot
+ * country: the Zimbabwe languages format as en-ZW, the Nigeria languages as
+ * en-NG. Plain English stays region-neutral (en-GB — day-month-year, no country
+ * claim) since it is shared across both pilots. (NOT en-ZA — this is a Zimbabwe
+ * and Nigeria project.)
+ */
+const FORMAT_LOCALE: Record<Locale, string> = {
+  en: 'en-GB',
+  sn: 'en-ZW',
+  nd: 'en-ZW',
+  yo: 'en-NG',
+  ig: 'en-NG',
+  ha: 'en-NG',
+  pcm: 'en-NG',
+};
+
+export function formatLocale(locale: Locale): string {
+  return FORMAT_LOCALE[locale] ?? 'en-GB';
+}
+
+/**
  * The one phrase vetted across the Zimbabwe languages (the same prompt the
  * WhatsApp rail uses to open the conversation). Every non-English locale falls
  * back to English until a native + clinical review supplies the translations.

@@ -204,7 +204,7 @@ function RecentCases({
             {cases.map((c) => (
               <tr key={c.id} className="border-t border-brand-100">
                 <td className="py-2 pr-3">
-                  {new Date(c.created_at).toLocaleString('en-ZA', {
+                  {new Date(c.created_at).toLocaleString('en-GB', {
                     dateStyle: 'short',
                     timeStyle: 'short',
                   })}

@@ -33,7 +33,7 @@ export default async function AppLayout({
   const { locale, dict } = await getI18n();
 
   return (
-    <DictionaryProvider dict={dict}>
+    <DictionaryProvider dict={dict} locale={locale}>
       <AppShell
         user={{
           name: session.user.name ?? session.user.email ?? 'Account',

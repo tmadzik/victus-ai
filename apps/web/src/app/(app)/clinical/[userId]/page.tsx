@@ -10,6 +10,8 @@ import {
 import { AssessmentTimeline } from '@/components/assessment-timeline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { formatLocale } from '@/i18n/config';
+import { getLocale } from '@/i18n';
 import { ApiError, apiClient } from '@/lib/api-client';
 import { auth } from '@/lib/auth';
 
@@ -29,6 +31,7 @@ export default async function ParticipantRecordPage({
   if (!CLINICAL_ROLES.includes(session.user.role)) redirect('/dashboard');
 
   const { userId } = await params;
+  const formatLoc = formatLocale(await getLocale());
 
   let record: ParticipantHistory | null = null;
   let referrals: ReferralResponse[] = [];
@@ -96,6 +99,7 @@ export default async function ParticipantRecordPage({
       <AssessmentTimeline
         triage={record.triage}
         toi={record.toi}
+        formatLoc={formatLoc}
         emptyHint="This participant has no assessments yet."
       />
     </div>

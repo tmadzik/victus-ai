@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useFormatLocale } from '@/i18n/context';
 import { eraseAccountAction } from '@/server/governance-actions';
 
 export function GovernanceClient({
@@ -31,6 +32,7 @@ export function GovernanceClient({
   summary: MyDataSummary;
   initialErasureRequests: ErasureRequestResponse[];
 }): React.ReactElement {
+  const fmtLoc = useFormatLocale();
   const [showModal, setShowModal] = useState(false);
 
   return (
@@ -50,13 +52,13 @@ export function GovernanceClient({
             <Field label="Role" value={summary.role} />
             <Field
               label="Account created"
-              value={new Date(summary.created_at).toLocaleString('en-ZA')}
+              value={new Date(summary.created_at).toLocaleString(fmtLoc)}
             />
             <Field
               label="Erased at"
               value={
                 summary.erased_at
-                  ? new Date(summary.erased_at).toLocaleString('en-ZA')
+                  ? new Date(summary.erased_at).toLocaleString(fmtLoc)
                   : '—'
               }
             />
@@ -133,7 +135,7 @@ export function GovernanceClient({
               <AlertTitle>Already erased</AlertTitle>
               <AlertDescription>
                 This account was erased on{' '}
-                {new Date(summary.erased_at).toLocaleString('en-ZA')}.
+                {new Date(summary.erased_at).toLocaleString(fmtLoc)}.
               </AlertDescription>
             </Alert>
           ) : (
@@ -299,6 +301,7 @@ function ErasureLedger({
 }: {
   requests: ErasureRequestResponse[];
 }): React.ReactElement {
+  const fmtLoc = useFormatLocale();
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full text-sm">
@@ -316,7 +319,7 @@ function ErasureLedger({
           {requests.map((r) => (
             <tr key={r.id} className="border-b border-brand-100">
               <td className="py-2 pr-4 font-mono text-xs text-brand-700">
-                {new Date(r.requested_at).toLocaleString('en-ZA')}
+                {new Date(r.requested_at).toLocaleString(fmtLoc)}
               </td>
               <td className="py-2 pr-4 font-mono text-xs text-brand-700">
                 {r.target_type}

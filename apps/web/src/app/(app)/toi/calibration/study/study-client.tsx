@@ -208,7 +208,7 @@ function ActiveSessionBlock({
               </Badge>
             </CardTitle>
             <CardDescription>
-              Started {new Date(active.session_started_at).toLocaleString('en-ZA')}{' '}
+              Started {new Date(active.session_started_at).toLocaleString('en-GB')}{' '}
               · {active.pair_count} pair{active.pair_count === 1 ? '' : 's'}{' '}
               recorded so far
             </CardDescription>
@@ -337,7 +337,7 @@ function SubjectsList({
                         {s.pair_count}
                       </td>
                       <td className="py-2 pr-4 font-mono text-xs text-brand-700">
-                        {new Date(s.enrolled_at).toLocaleDateString('en-ZA')}
+                        {new Date(s.enrolled_at).toLocaleDateString('en-GB')}
                       </td>
                       <td className="py-2 pr-4">
                         {isAnonymised || !s.is_active ? (
@@ -406,7 +406,7 @@ function SessionsList({
                 <tr key={sessionRow.id} className="border-b border-brand-100">
                   <td className="py-2 pr-4 font-mono text-xs text-brand-700">
                     {new Date(sessionRow.session_started_at).toLocaleString(
-                      'en-ZA',
+                      'en-GB',
                       { dateStyle: 'short', timeStyle: 'short' },
                     )}
                   </td>
@@ -427,7 +427,7 @@ function SessionsList({
                   </td>
                   <td className="py-2 pr-4 font-mono text-xs text-brand-700">
                     {sessionRow.ended_at
-                      ? new Date(sessionRow.ended_at).toLocaleString('en-ZA', {
+                      ? new Date(sessionRow.ended_at).toLocaleString('en-GB', {
                           dateStyle: 'short',
                           timeStyle: 'short',
                         })
