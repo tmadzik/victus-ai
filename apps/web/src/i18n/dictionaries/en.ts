@@ -80,7 +80,12 @@ export const en = {
       submitting: 'Submitting…',
       run: 'Run triage assessment',
     },
-    result: { title: 'Per-disease risk profile', restart: 'Start a new assessment' },
+    result: {
+      title: 'Per-disease risk profile',
+      restart: 'Start a new assessment',
+      download: 'Download summary',
+      summaryTitle: 'Pathway A — NCD risk summary',
+    },
   },
   // Pathway B wizard chrome.
   toi: {
@@ -108,6 +113,8 @@ export const en = {
       recaptureRequired: 'Recapture required',
       warnings: 'Capture warnings',
       restart: 'Start a new capture',
+      download: 'Download summary',
+      summaryTitle: 'Pathway B — TOI biomarker summary',
     },
   },
 };

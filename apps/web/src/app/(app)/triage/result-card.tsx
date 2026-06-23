@@ -79,7 +79,13 @@ export function TriageResultCard({
     assessment.model_kind.startsWith('trained_torch') && !isOverride;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print-summary">
+      {/* Print-only document header (hidden on screen). */}
+      <div className="print-only mb-4 border-b border-brand-200 pb-3">
+        <p className="text-lg font-semibold text-brand-950">Victus AI</p>
+        <p className="text-sm text-brand-700">{tr.summaryTitle}</p>
+      </div>
+
       {/* ---- Overall summary banner ---- */}
       <Card className={cn('border-l-4', STATE_ACCENT[assessment.overall_state])}>
         <CardHeader>
@@ -203,9 +209,14 @@ export function TriageResultCard({
               timeStyle: 'short',
             })}
           </p>
-          <Button onClick={onRestart} variant="outline" size="sm">
-            {tr.restart}
-          </Button>
+          <div className="print-hide flex gap-2">
+            <Button onClick={() => window.print()} variant="outline" size="sm">
+              {tr.download}
+            </Button>
+            <Button onClick={onRestart} variant="outline" size="sm">
+              {tr.restart}
+            </Button>
+          </div>
         </CardFooter>
       </Card>
 
