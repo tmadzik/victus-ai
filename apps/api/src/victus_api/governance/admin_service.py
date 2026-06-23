@@ -45,6 +45,7 @@ from victus_api.governance.admin_schemas import (
     AuditLogEntry,
     AuditLogResponse,
 )
+from victus_api.governance.jurisdictions import jurisdiction_for_site
 from victus_api.governance.schemas import (
     ErasureBasis,
     ErasureJurisdiction,
@@ -309,11 +310,15 @@ async def admin_propose_erase_account(
     if target is None:
         raise NotFoundError("User not found.")
 
+    # Jurisdiction follows the target's enrolment site (e.g. NG → NDPA).
+    jurisdiction = jurisdiction_for_site(
+        target.site_code, fallback=payload.jurisdiction
+    )
     request_row = await _create_account_erasure_request(
         db,
         actor_user=admin,
         target_user=target,
-        jurisdiction=payload.jurisdiction,
+        jurisdiction=jurisdiction,
         request_basis=payload.request_basis,
         notes=payload.notes,
         requires_approval=True,
@@ -339,11 +344,17 @@ async def admin_propose_anonymise_subject(
     if subject is None:
         raise NotFoundError("Study subject not found.")
 
+    # A study subject has no site of its own; its jurisdiction follows the
+    # enrolment site of the researcher who registered it (e.g. NG → NDPA).
+    owner = await db.get(User, subject.user_id)
+    jurisdiction = jurisdiction_for_site(
+        owner.site_code if owner else None, fallback=payload.jurisdiction
+    )
     request_row = await _create_subject_anonymisation_request(
         db,
         actor_user=admin,
         subject=subject,
-        jurisdiction=payload.jurisdiction,
+        jurisdiction=jurisdiction,
         request_basis=payload.request_basis,
         notes=payload.notes,
         requires_approval=True,

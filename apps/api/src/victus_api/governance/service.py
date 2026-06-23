@@ -564,11 +564,14 @@ async def anonymise_subject(
     )
     if subject is None:
         raise NotFoundError("Study subject not found for this researcher.")
+    # A study subject has no site of its own; its jurisdiction follows the
+    # enrolment site of the researcher who registered it (the requester here).
+    jurisdiction = jurisdiction_for_site(user.site_code, fallback=payload.jurisdiction)
     return await anonymise_subject_record(
         db,
         actor_user=user,
         subject=subject,
-        jurisdiction=payload.jurisdiction,
+        jurisdiction=jurisdiction,
         request_basis=payload.request_basis,
         notes=payload.notes,
         settings=settings,
