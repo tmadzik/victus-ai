@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import uuid
+from datetime import UTC, datetime
 
 from pydantic import ValidationError
 
@@ -79,6 +80,7 @@ def build_result_payload(toi: ToiAssessmentResponse) -> KioskResultPayload:
         headline="Your wellness check-up is ready",
         body=body,
         vitals=vitals,
+        generated_at=datetime.now(UTC),
     )
 
 
