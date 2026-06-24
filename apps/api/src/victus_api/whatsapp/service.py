@@ -141,6 +141,7 @@ async def process_inbound(
         text=msg.text,
         has_video=(msg.type == "video"),
         media_id=msg.media_id,
+        site_code=site_code,
     )
 
     # STOP/DELETE — erase the session row and scrub this phone's jobs, so the

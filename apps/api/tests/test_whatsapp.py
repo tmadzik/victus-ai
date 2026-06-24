@@ -17,6 +17,7 @@ from victus_api.whatsapp.conversation import (
     EnqueueCapture,
     SessionData,
     advance,
+    start_session,
 )
 
 # --- signature ---------------------------------------------------------------
@@ -158,6 +159,64 @@ def test_consent_decline_ends_flow() -> None:
     turn = _say(s, "no")
     assert s.state is ConvState.DECLINED
     assert "won't collect" in turn.replies[0].lower()
+
+
+# --- site-aware language menu ------------------------------------------------
+
+
+def test_nigeria_menu_offers_nigerian_languages() -> None:
+    _, turn = start_session("2348010000000", "NG")
+    menu = turn.replies[0]
+    for label in ("English", "Yor", "Igbo", "Hausa", "Naij"):
+        assert label in menu
+    # Zimbabwe languages must not appear on a Nigeria instance.
+    assert "Shona" not in menu and "Ndebele" not in menu
+
+
+def test_nigeria_digits_map_to_nigerian_languages() -> None:
+    # On NG, "2" is Yoruba (not Shona); 3/4/5 cover Igbo/Hausa/Pidgin.
+    for digit, code in (("2", "yo"), ("3", "ig"), ("4", "ha"), ("5", "pcm")):
+        s = SessionData(phone="2348010000001")
+        advance(s, text=digit, has_video=False, site_code="NG")
+        assert s.language == code and s.state is ConvState.CONSENT
+
+
+def test_zimbabwe_menu_unchanged() -> None:
+    _, turn = start_session("263770000001", "ZW")
+    assert "Shona" in turn.replies[0] and "Ndebele" in turn.replies[0]
+    for digit, code in (("2", "sn"), ("3", "nd")):
+        s = SessionData(phone="263770000002")
+        advance(s, text=digit, has_video=False, site_code="ZW")
+        assert s.language == code
+
+
+def test_unknown_site_keeps_default_menu() -> None:
+    # No site (e.g. the dev default) keeps the original English/Shona/Ndebele.
+    _, turn = start_session("100000000")
+    assert "Shona" in turn.replies[0]
+    s = SessionData(phone="100000001")
+    advance(s, text="2", has_video=False)  # no site_code
+    assert s.language == "sn"
+
+
+def test_alias_only_accepted_when_site_offers_it() -> None:
+    # "yoruba" is valid on NG, rejected on ZW (re-prompts, stays in LANGUAGE).
+    ng = SessionData(phone="2348010000003")
+    advance(ng, text="yoruba", has_video=False, site_code="NG")
+    assert ng.language == "yo" and ng.state is ConvState.CONSENT
+
+    zw = SessionData(phone="263770000003")
+    advance(zw, text="yoruba", has_video=False, site_code="ZW")
+    assert zw.language is None and zw.state is ConvState.LANGUAGE
+
+
+def test_nigerian_language_prompts_fall_back_to_english() -> None:
+    # Choosing Yoruba records the language; conversational copy is English until
+    # translated (the consent prompt is the authoritative English text).
+    s = SessionData(phone="2348010000004")
+    turn = advance(s, text="2", has_video=False, site_code="NG")  # Yoruba
+    assert s.language == "yo"
+    assert "consent" in turn.replies[0].lower()
 
 
 def test_restart_from_complete() -> None:
