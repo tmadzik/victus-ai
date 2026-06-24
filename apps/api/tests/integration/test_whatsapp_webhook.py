@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from victus_api.config import get_settings
 from victus_api.db.models import (
     ConsentRecord,
     JobStatus,
@@ -26,6 +27,8 @@ from victus_api.db.models import (
     User,
     WhatsAppSession,
 )
+from victus_api.whatsapp.meta import InboundMessage
+from victus_api.whatsapp.service import process_inbound
 
 pytestmark = pytest.mark.integration
 
@@ -309,6 +312,10 @@ def test_consent_anchors_user_and_links_capture(client: Any) -> None:
     assert user is not None
     # Pseudonymous: no email / password / name stored on the anchor user.
     assert user.email is None and user.hashed_password is None and user.full_name is None
+    # The anchor is stamped with the deployment's configured site (so a WhatsApp
+    # participant gets the same jurisdiction as web sign-ups), not left to the
+    # column default by omission.
+    assert user.site_code == get_settings().site_code
     active = {c.consent_type.value for c in consents if c.revoked_at is None}
     assert active == {"TRIAGE", "TOI_IMAGING"}
     assert all(c.version == "whatsapp-v1" for c in consents)
@@ -327,3 +334,38 @@ def test_consent_anchors_user_and_links_capture(client: Any) -> None:
     jobs, _ = asyncio.run(_query(phone))
     assert len(jobs) == 1
     assert jobs[0].user_id == uid, "capture job must carry the anchored user_id"
+
+
+def test_anchor_stamps_configured_site_code() -> None:
+    """A non-default configured site (e.g. NG) flows through process_inbound to
+    the anchored participant — proving the stamp follows config, not the column
+    default. Driven at the service layer so we can pass an explicit site_code
+    independent of the test instance's settings."""
+    phone = _unique_phone()
+
+    async def _drive() -> None:
+        # Fresh NullPool engine in this loop (the app's pooled engine is bound to
+        # a different event loop); one transaction committed per message, as the
+        # webhook does.
+        engine = create_async_engine(os.environ["DATABASE_URL"], poolclass=NullPool)
+        try:
+            for text in ("1", "yes"):  # language, then consent → anchors the user
+                msg = InboundMessage(
+                    from_phone=phone,
+                    message_id=f"wamid.{uuid.uuid4().hex}",
+                    type="text",
+                    text=text,
+                )
+                async with AsyncSession(engine) as db:
+                    await process_inbound(db, msg, site_code="NG")
+                    await db.commit()
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_drive())
+
+    _, session = asyncio.run(_query(phone))
+    assert session is not None and session.user_id is not None
+    user, _ = asyncio.run(_query_user_and_consents(session.user_id))
+    assert user is not None
+    assert user.site_code == "NG"

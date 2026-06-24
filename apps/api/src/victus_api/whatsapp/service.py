@@ -37,7 +37,9 @@ WHATSAPP_CONSENT_TYPES: tuple[ConsentType, ...] = (
 )
 
 
-async def _anchor_participant(db: AsyncSession, row: WhatsAppSession) -> User:
+async def _anchor_participant(
+    db: AsyncSession, row: WhatsAppSession, *, site_code: str
+) -> User:
     """Create a pseudonymous User + versioned consents the first time a phone
     grants consent, and link it to the session.
 
@@ -45,8 +47,13 @@ async def _anchor_participant(db: AsyncSession, row: WhatsAppSession) -> User:
     an identity anchor so captures persist to the clinician app and the
     participant is reachable by the standard account-erasure flow. The phone
     lives only on the session (deleted on STOP/erasure) and jobs (scrubbed).
+
+    ``site_code`` is the deployment's configured site (e.g. "NG"), stamped onto
+    the anchor exactly as web registration does — so a WhatsApp participant
+    resolves to the same data-protection jurisdiction (NG → NDPA) as everyone
+    else on that instance, rather than the column default.
     """
-    user = User(role=UserRole.PATIENT, is_active=True)
+    user = User(role=UserRole.PATIENT, is_active=True, site_code=site_code)
     db.add(user)
     await db.flush()
     row.user_id = user.id
@@ -112,12 +119,15 @@ async def _get_or_create(db: AsyncSession, phone: str) -> WhatsAppSession:
 
 
 async def process_inbound(
-    db: AsyncSession, msg: InboundMessage
+    db: AsyncSession, msg: InboundMessage, *, site_code: str
 ) -> list[str]:
     """Advance one message; persist state; enqueue on video. Returns replies.
 
     Idempotent on ``message_id``: Meta re-delivers, so a message already applied
     to this session is a no-op (returns no replies).
+
+    ``site_code`` is the deployment's configured site, stamped onto the
+    pseudonymous participant anchored on first consent.
     """
     row = await _get_or_create(db, msg.from_phone)
 
@@ -148,7 +158,7 @@ async def process_inbound(
     # consents (once per participant) so the eventual capture persists and the
     # participant is governable.
     if row.consent and row.user_id is None:
-        await _anchor_participant(db, row)
+        await _anchor_participant(db, row, site_code=site_code)
 
     if turn.action is not None:
         await enqueue(
