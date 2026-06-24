@@ -17,6 +17,7 @@ import contextlib
 from fastapi import APIRouter, Request, Response, status
 from fastapi.responses import PlainTextResponse
 
+from victus_api.config import get_settings
 from victus_api.core.logging import get_logger
 from victus_api.db.session import session_scope
 from victus_api.whatsapp.config import WhatsAppConfig
@@ -69,11 +70,12 @@ async def inbound(request: Request) -> Response:
 
     messages = parse_inbound(payload)
     replier = build_replier(_config)
+    site_code = get_settings().site_code
 
     for msg in messages:
         try:
             async with session_scope() as db:
-                replies = await process_inbound(db, msg)
+                replies = await process_inbound(db, msg, site_code=site_code)
             # Send only after commit — never announce unpersisted state.
             for text in replies:
                 with contextlib.suppress(Exception):
