@@ -14,10 +14,15 @@ without advancing.
 The collected fields map 1:1 onto ``TriageAssessmentRequest`` so the webhook can
 run NCD-3B triage on the intake while the worker processes the video for vitals.
 
-LOCALISATION: English prompts are complete and authoritative. Shona ("sn") and
-Ndebele ("nd") currently fall back to English for the conversational prompts and
-MUST be translated by a native clinical speaker before real participant contact.
-The *result*/*re-record* messages (worker.messages) are already localised.
+LOCALISATION: the language menu is *site-aware* — a Zimbabwe deployment offers
+English/Shona/Ndebele, a Nigeria deployment English/Yoruba/Igbo/Hausa/Naija
+(Nigerian Pidgin) — driven by the instance's ``site_code``. English prompts are
+complete and authoritative; every other language currently falls back to English
+for the conversational prompts and MUST be translated by a native clinical
+speaker before real participant contact. The chosen language is still recorded
+on the session and carried to the worker, so translations light up without code
+changes. The *result*/*re-record* messages (worker.messages) are already
+localised for the languages that have copy.
 """
 
 from __future__ import annotations
@@ -113,14 +118,79 @@ class ConversationTurn:
 PURGE_COMMANDS: frozenset[str] = frozenset({"stop", "delete", "cancel", "remove"})
 
 
+# --- language menu (site-aware) ----------------------------------------------
+
+# (digit, language code, display label) for one menu entry.
+LanguageOption = tuple[str, str, str]
+
+
+@dataclass(frozen=True)
+class _LangMenu:
+    lead_in: str
+    options: tuple[LanguageOption, ...]
+
+
+# Per-site language menus. A deployment shows only its country's languages.
+_LANG_MENUS: dict[str, _LangMenu] = {
+    "ZW": _LangMenu(
+        "Choose a language / Sarudza mutauro / Khetha ulimi:",
+        (
+            ("1", "en", "English"),
+            ("2", "sn", "Shona"),
+            ("3", "nd", "Ndebele"),
+        ),
+    ),
+    "NG": _LangMenu(
+        "Choose a language:",
+        (
+            ("1", "en", "English"),
+            ("2", "yo", "Yorùbá"),
+            ("3", "ig", "Igbo"),
+            ("4", "ha", "Hausa"),
+            ("5", "pcm", "Naijá"),
+        ),
+    ),
+}
+# Unknown / unset site keeps the original English+Shona+Ndebele menu.
+_DEFAULT_MENU = _LANG_MENUS["ZW"]
+
+# Language-name aliases accepted in addition to the menu digit / code, restricted
+# at parse time to the languages the site actually offers.
+_LANG_ALIASES: dict[str, str] = {
+    "english": "en",
+    "shona": "sn",
+    "chishona": "sn",
+    "ndebele": "nd",
+    "isindebele": "nd",
+    "yoruba": "yo",
+    "igbo": "ig",
+    "hausa": "ha",
+    "pidgin": "pcm",
+    "naija": "pcm",
+    "pcm": "pcm",
+}
+
+
+def _menu_for_site(site_code: str | None) -> _LangMenu:
+    if not site_code:
+        return _DEFAULT_MENU
+    return _LANG_MENUS.get(site_code.strip().upper(), _DEFAULT_MENU)
+
+
+def _welcome(site_code: str | None = None) -> str:
+    menu = _menu_for_site(site_code)
+    options = "   ".join(
+        f"{digit}️⃣ {label}" for digit, _, label in menu.options
+    )
+    return (
+        "👋 Welcome to *Victus* — a free, contactless wellness check-up.\n\n"
+        f"{menu.lead_in}\n{options}"
+    )
+
+
 # --- prompt copy (English authoritative; see LOCALISATION note above) --------
 
 _EN: dict[str, str] = {
-    "welcome": (
-        "👋 Welcome to *Victus* — a free, contactless wellness check-up.\n\n"
-        "Choose a language / Sarudza mutauro / Khetha ulimi:\n"
-        "1️⃣ English   2️⃣ Shona   3️⃣ Ndebele"
-    ),
     "consent": (
         "This is a *wellness screening, not a medical diagnosis*, and it is part "
         "of a research demonstrator. We'll ask a few health questions and a "
@@ -196,16 +266,23 @@ def _parse_int(text: str | None, lo: int, hi: int) -> int | None:
     return int(val) if val is not None else None
 
 
-def _parse_language(text: str | None) -> str | None:
+def _parse_language(text: str | None, site_code: str | None = None) -> str | None:
+    """Resolve a language choice against the site's menu.
+
+    Accepts the menu digit, the language code, or the display label, plus a few
+    name aliases — but only for languages the site actually offers, so "2" maps
+    to Shona on a ZW instance and Yoruba on an NG instance.
+    """
     if not text:
         return None
     t = text.strip().lower()
-    if t in ("1", "english", "en"):
-        return "en"
-    if t in ("2", "shona", "chishona", "sn"):
-        return "sn"
-    if t in ("3", "ndebele", "isindebele", "nd"):
-        return "nd"
+    menu = _menu_for_site(site_code)
+    for digit, code, label in menu.options:
+        if t in (digit, code, label.lower()):
+            return code
+    alias = _LANG_ALIASES.get(t)
+    if alias is not None and any(code == alias for _, code, _ in menu.options):
+        return alias
     return None
 
 
@@ -233,10 +310,12 @@ def _reset(session: SessionData) -> None:
     session.contextual = []
 
 
-def start_session(phone: str) -> tuple[SessionData, ConversationTurn]:
-    """First contact: greet and ask for language."""
+def start_session(
+    phone: str, site_code: str | None = None
+) -> tuple[SessionData, ConversationTurn]:
+    """First contact: greet and ask for language (menu varies by site)."""
     session = SessionData(phone=phone)
-    return session, ConversationTurn(replies=[_t("welcome", None)])
+    return session, ConversationTurn(replies=[_welcome(site_code)])
 
 
 def advance(
@@ -245,8 +324,13 @@ def advance(
     text: str | None,
     has_video: bool,
     media_id: str | None = None,
+    site_code: str | None = None,
 ) -> ConversationTurn:
-    """Advance the conversation by one inbound message (mutates ``session``)."""
+    """Advance the conversation by one inbound message (mutates ``session``).
+
+    ``site_code`` selects the language menu (which languages are offered and how
+    digits map to them); it has no effect once a language is chosen.
+    """
     lang = session.language
 
     # Global data-deletion command — honour the "reply STOP to delete" promise
@@ -259,14 +343,14 @@ def advance(
     if session.state in (ConvState.COMPLETE, ConvState.DECLINED):
         if text and text.strip().lower() in ("start", "hi", "hello", "restart"):
             _reset(session)
-            return ConversationTurn(replies=[_t("welcome", None)])
+            return ConversationTurn(replies=[_welcome(site_code)])
         key = "complete" if session.state is ConvState.COMPLETE else "declined"
         return ConversationTurn(replies=[_t(key, lang)])
 
     if session.state is ConvState.LANGUAGE:
-        chosen = _parse_language(text)
+        chosen = _parse_language(text, site_code)
         if chosen is None:
-            return ConversationTurn(replies=[_t("welcome", None)])
+            return ConversationTurn(replies=[_welcome(site_code)])
         session.language = chosen
         session.state = ConvState.CONSENT
         return ConversationTurn(replies=[_t("consent", chosen)])
