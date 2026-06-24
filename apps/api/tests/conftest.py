@@ -51,6 +51,11 @@ _set_default("API_ENV", "test")
 _set_default("JWT_SECRET_KEY", "test-jwt-secret-" + "0" * 40)
 _set_default("INTERNAL_SERVICE_TOKEN", "test-internal-token-" + "0" * 24)
 _set_default("PSEUDO_SALT", "test-pseudo-salt-" + "0" * 40)
+# Use NullPool in tests. Service-layer paths exercised directly (the kiosk
+# worker, process_inbound) run inside their own ``asyncio.run`` loop, and a
+# pooled asyncpg connection bound to a different loop raises "attached to a
+# different loop". A fresh connection per session sidesteps that entirely.
+_set_default("DB_DISABLE_POOL", "1")
 
 # Prefer the per-disease multi-head checkpoint; fall back to the legacy
 # single-head demo checkpoint if the newer artifact is absent. (The legacy

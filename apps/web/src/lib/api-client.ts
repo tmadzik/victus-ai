@@ -11,6 +11,17 @@ import {
   AdminUserListResponseSchema,
   type AnonymiseSubjectRequest,
   ApiErrorSchema,
+  type KioskSessionResponse,
+  KioskSessionResponseSchema,
+  type KioskSessionStatusResponse,
+  KioskSessionStatusResponseSchema,
+  type KioskCaptureRequest,
+  type KioskCaptureResponse,
+  KioskCaptureResponseSchema,
+  type KioskResultGateResponse,
+  KioskResultGateResponseSchema,
+  type KioskResultPayload,
+  KioskResultPayloadSchema,
   type AuditLogResponse,
   AuditLogResponseSchema,
   AuthSessionSchema,
@@ -82,11 +93,13 @@ interface RequestOptions {
   body?: unknown;
   accessToken?: string;
   internal?: boolean;
+  /** Attach the per-deployment kiosk device credentials (X-Kiosk-Id/Token). */
+  kiosk?: boolean;
   cache?: RequestCache;
 }
 
 async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, accessToken, internal, cache = 'no-store' } = opts;
+  const { method = 'GET', body, accessToken, internal, kiosk, cache = 'no-store' } = opts;
 
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -94,6 +107,10 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
   if (internal) headers['X-Internal-Token'] = serverEnv.INTERNAL_SERVICE_TOKEN;
+  if (kiosk && serverEnv.KIOSK_ID && serverEnv.KIOSK_DEVICE_TOKEN) {
+    headers['X-Kiosk-Id'] = serverEnv.KIOSK_ID;
+    headers['X-Kiosk-Token'] = serverEnv.KIOSK_DEVICE_TOKEN;
+  }
 
   const response = await fetch(`${serverEnv.INTERNAL_API_BASE_URL}${path}`, {
     method,
@@ -677,6 +694,60 @@ export const apiClient = {
       { accessToken },
     );
     return ParticipantHistorySchema.parse(raw);
+  },
+
+  // ---- Mobile Clinic Gateway (kiosk rail) ---------------------------------
+
+  /** Open a kiosk session (device-authed). Returns the QR/deep-link payload. */
+  async createKioskSession(): Promise<KioskSessionResponse> {
+    const raw = await request<unknown>('/kiosk/sessions', {
+      method: 'POST',
+      kiosk: true,
+    });
+    return KioskSessionResponseSchema.parse(raw);
+  },
+
+  /** Poll a kiosk session's status (device-authed). */
+  async getKioskSessionStatus(
+    sessionId: string,
+  ): Promise<KioskSessionStatusResponse> {
+    const raw = await request<unknown>(`/kiosk/sessions/${sessionId}`, {
+      kiosk: true,
+    });
+    return KioskSessionStatusResponseSchema.parse(raw);
+  },
+
+  /** Submit derived capture signals for processing (device-authed). */
+  async submitKioskCapture(
+    sessionId: string,
+    payload: KioskCaptureRequest,
+  ): Promise<KioskCaptureResponse> {
+    const raw = await request<unknown>(`/kiosk/sessions/${sessionId}/capture`, {
+      method: 'POST',
+      kiosk: true,
+      body: payload,
+    });
+    return KioskCaptureResponseSchema.parse(raw);
+  },
+
+  /** Probe a result link before showing the OTP form (public). */
+  async getKioskResultGate(token: string): Promise<KioskResultGateResponse> {
+    const raw = await request<unknown>(
+      `/kiosk/results/${encodeURIComponent(token)}`,
+    );
+    return KioskResultGateResponseSchema.parse(raw);
+  },
+
+  /** Unlock a result with the 4-digit OTP (public, single use). */
+  async unlockKioskResult(
+    token: string,
+    otp: string,
+  ): Promise<KioskResultPayload> {
+    const raw = await request<unknown>(
+      `/kiosk/results/${encodeURIComponent(token)}/unlock`,
+      { method: 'POST', body: { otp } },
+    );
+    return KioskResultPayloadSchema.parse(raw);
   },
 };
 

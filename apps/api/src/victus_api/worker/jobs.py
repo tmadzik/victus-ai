@@ -45,7 +45,8 @@ def _now() -> datetime:
 async def enqueue(
     db: AsyncSession,
     *,
-    media_id: str,
+    media_id: str | None = None,
+    channel: str = "WHATSAPP",
     wa_phone: str | None = None,
     wa_message_id: str | None = None,
     language: str = "en",
@@ -53,9 +54,16 @@ async def enqueue(
     intake: dict[str, Any] | None = None,
     max_attempts: int = 3,
 ) -> ProcessingJob:
-    """Insert a QUEUED job (called by the webhook). Returns the flushed row."""
+    """Insert a QUEUED job (called by the webhook). Returns the flushed row.
+
+    ``channel`` partitions the queue: the WhatsApp runner only claims
+    ``WHATSAPP`` jobs, so a ``KIOSK`` job (which carries derived signals in
+    ``intake`` rather than a ``media_id``) waits for the kiosk worker instead of
+    being failed for a missing media id.
+    """
     job = ProcessingJob(
         status=JobStatus.QUEUED,
+        channel=channel,
         wa_phone=wa_phone,
         wa_message_id=wa_message_id,
         media_id=media_id,
@@ -117,19 +125,20 @@ async def scrub_user(db: AsyncSession, user_id: uuid.UUID) -> int:
 
 
 async def claim_next_batch(
-    db: AsyncSession, *, limit: int
+    db: AsyncSession, *, limit: int, channel: str = "WHATSAPP"
 ) -> list[ClaimedJob]:
     """Atomically claim up to ``limit`` eligible jobs and mark them PROCESSING.
 
-    Eligible = QUEUED and (no backoff set or backoff elapsed). The caller's
-    transaction must commit to release the row locks and persist the PROCESSING
-    transition before processing begins.
+    Eligible = QUEUED, matching ``channel``, and (no backoff set or backoff
+    elapsed). The caller's transaction must commit to release the row locks and
+    persist the PROCESSING transition before processing begins.
     """
     now = _now()
     stmt = (
         select(ProcessingJob)
         .where(
             ProcessingJob.status == JobStatus.QUEUED,
+            ProcessingJob.channel == channel,
             or_(
                 ProcessingJob.next_attempt_at.is_(None),
                 ProcessingJob.next_attempt_at <= now,

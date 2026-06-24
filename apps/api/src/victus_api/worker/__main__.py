@@ -19,6 +19,7 @@ import asyncio
 
 from victus_api.core.logging import get_logger
 from victus_api.worker.config import WorkerConfig
+from victus_api.worker.kiosk_runner import run_kiosk_loop, run_kiosk_once
 from victus_api.worker.media import LocalFileMediaFetcher, WhatsAppCloudMediaFetcher
 from victus_api.worker.reply import Replier, WhatsAppCloudReplier
 from victus_api.worker.runner import run_loop, run_once
@@ -63,11 +64,29 @@ def main(argv: list[str] | None = None) -> int:
     fetcher, replier = _build_io(args)
 
     if args.once:
-        handled = asyncio.run(run_once(cfg, fetcher=fetcher, replier=replier))
-        log.info("worker_run_once_complete", handled=handled)
+
+        async def _drain() -> tuple[int, int]:
+            wa = await run_once(cfg, fetcher=fetcher, replier=replier)
+            kiosk = await run_kiosk_once(cfg, replier=replier)
+            return wa, kiosk
+
+        whatsapp_handled, kiosk_handled = asyncio.run(_drain())
+        log.info(
+            "worker_run_once_complete",
+            whatsapp=whatsapp_handled,
+            kiosk=kiosk_handled,
+        )
         return 0
 
-    asyncio.run(run_loop(cfg, fetcher=fetcher, replier=replier))
+    async def _loops() -> None:
+        # The WhatsApp (media) and kiosk (derived-signal) queues are independent
+        # channels; poll both concurrently in the persistent worker.
+        await asyncio.gather(
+            run_loop(cfg, fetcher=fetcher, replier=replier),
+            run_kiosk_loop(cfg, replier=replier),
+        )
+
+    asyncio.run(_loops())
     return 0
 
 

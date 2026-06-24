@@ -25,6 +25,7 @@ from victus_api.core.logging import configure_logging, get_logger, request_id_va
 from victus_api.db.session import dispose_engine, get_engine
 from victus_api.governance.admin_router import router as governance_admin_router
 from victus_api.governance.router import router as governance_router
+from victus_api.kiosk.router import router as kiosk_router
 from victus_api.notifications.router import router as notifications_router
 from victus_api.pathways.router import router as pathways_router
 from victus_api.referrals.router import router as referrals_router
@@ -124,6 +125,7 @@ def create_app() -> FastAPI:
     app.include_router(governance_admin_router)
     app.include_router(notifications_router)
     app.include_router(whatsapp_router)
+    app.include_router(kiosk_router)
     app.include_router(research_router)
     app.include_router(clinical_router)
     app.include_router(referrals_router)

@@ -1154,3 +1154,85 @@ export const ReferralResponseSchema = z.object({
   updated_at: z.string(),
 });
 export type ReferralResponse = z.infer<typeof ReferralResponseSchema>;
+
+// ===========================================================================
+// MOBILE CLINIC GATEWAY (kiosk rail)
+// ===========================================================================
+
+/** Lifecycle of a public-kiosk capture attempt (mirrors KioskSessionStatus). */
+export const KioskSessionState = {
+  INITIATED: 'INITIATED',
+  LINKED: 'LINKED',
+  CONSENTED: 'CONSENTED',
+  CAPTURED: 'CAPTURED',
+  PROCESSING: 'PROCESSING',
+  COMPLETE: 'COMPLETE',
+  EXPIRED: 'EXPIRED',
+  ABORTED: 'ABORTED',
+} as const;
+export type KioskSessionState =
+  (typeof KioskSessionState)[keyof typeof KioskSessionState];
+
+export const KioskSessionResponseSchema = z.object({
+  id: z.string().uuid(),
+  status: z.string(),
+  site_code: z.string(),
+  verification_nonce: z.string(),
+  qr_text: z.string(),
+  whatsapp_deep_link: z.string().nullable(),
+  expires_at: z.string(),
+  created_at: z.string(),
+});
+export type KioskSessionResponse = z.infer<typeof KioskSessionResponseSchema>;
+
+export const KioskSessionStatusResponseSchema = z.object({
+  id: z.string().uuid(),
+  status: z.string(),
+  linked: z.boolean(),
+  consented: z.boolean(),
+  result_ready: z.boolean(),
+  expires_at: z.string(),
+});
+export type KioskSessionStatusResponse = z.infer<
+  typeof KioskSessionStatusResponseSchema
+>;
+
+/** Derived, in-browser-extracted capture signals — never raw frames. */
+export const KioskCaptureRequestSchema = z.object({
+  signal_quality_index: z.number().min(0).max(1).nullable().optional(),
+  illumination_score: z.number().min(0).max(1).nullable().optional(),
+  face_bbox_ratio: z.number().min(0).max(1).nullable().optional(),
+  frame_count: z.number().int().min(0).default(0),
+  error_flags: z.array(z.string().max(64)).max(32).default([]),
+  rppg_signal: z.record(z.string(), z.unknown()).nullable().optional(),
+});
+export type KioskCaptureRequest = z.infer<typeof KioskCaptureRequestSchema>;
+
+export const KioskCaptureResponseSchema = z.object({
+  id: z.string().uuid(),
+  status: z.string(),
+  processing_job_id: z.string().uuid().nullable(),
+});
+export type KioskCaptureResponse = z.infer<typeof KioskCaptureResponseSchema>;
+
+export const KioskResultGateResponseSchema = z.object({
+  requires_otp: z.boolean(),
+  expires_at: z.string(),
+  locked: z.boolean(),
+  attempts_remaining: z.number().int().min(0),
+});
+export type KioskResultGateResponse = z.infer<
+  typeof KioskResultGateResponseSchema
+>;
+
+/** The decrypted, non-diagnostic triage summary shown on the secure portal. */
+export const KioskResultPayloadSchema = z.object({
+  schema_version: z.number().int().default(1),
+  triage_state: z.nativeEnum(TriageState).nullable().optional(),
+  headline: z.string(),
+  body: z.string(),
+  vitals: z.record(z.string(), z.unknown()).default({}),
+  disclaimer: z.string(),
+  generated_at: z.string(),
+});
+export type KioskResultPayload = z.infer<typeof KioskResultPayloadSchema>;
