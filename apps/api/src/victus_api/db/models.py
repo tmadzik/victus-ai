@@ -15,6 +15,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     UniqueConstraint,
     func,
@@ -1260,5 +1261,277 @@ class Referral(Base):
     __table_args__ = (
         Index(
             "ix_referrals_participant_created", "participant_user_id", "created_at"
+        ),
+    )
+
+
+class KioskSessionStatus(str, enum.Enum):
+    """Lifecycle of a public-kiosk capture attempt (Mobile Clinic Gateway).
+
+    INITIATED  -> kiosk created the row and is showing the QR; nobody linked
+    LINKED     -> an inbound WhatsApp message bound an MSISDN to the session
+    CONSENTED  -> the linked participant granted capture consent
+    CAPTURED   -> frames processed in-memory; only derived metadata persisted
+    PROCESSING -> a processing_jobs row is running the pipeline
+    COMPLETE   -> result encrypted + access token minted + notification sent
+    EXPIRED    -> session token lapsed (inactivity / TTL) before completion
+    ABORTED    -> torn down explicitly (kiosk purge / participant withdrew)
+    """
+
+    INITIATED = "INITIATED"
+    LINKED = "LINKED"
+    CONSENTED = "CONSENTED"
+    CAPTURED = "CAPTURED"
+    PROCESSING = "PROCESSING"
+    COMPLETE = "COMPLETE"
+    EXPIRED = "EXPIRED"
+    ABORTED = "ABORTED"
+
+
+class KioskSession(Base):
+    """One public-kiosk capture attempt.
+
+    Links *out* to the shared rails rather than forking them: ``user_id`` is the
+    pseudonymous account anchored at consent (no PII), ``whatsapp_session_id`` is
+    the conversation row that carries the erasable cleartext phone, and
+    ``processing_job_id`` is the async pipeline job. ``verification_nonce`` is the
+    single-use code embedded in the QR-prefilled WhatsApp text that lets the
+    webhook bind an inbound MSISDN to this session.
+    """
+
+    __tablename__ = "kiosk_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=func.gen_random_uuid(),
+    )
+    kiosk_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Deployment site / country — drives jurisdiction + retention/consent copy.
+    site_code: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="DEFAULT"
+    )
+    status: Mapped[KioskSessionStatus] = mapped_column(
+        SAEnum(KioskSessionStatus, name="kiosk_session_status", native_enum=True),
+        nullable=False,
+        default=KioskSessionStatus.INITIATED,
+        server_default=KioskSessionStatus.INITIATED.value,
+    )
+    verification_nonce: Mapped[str] = mapped_column(
+        String(32), nullable=False, unique=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    whatsapp_session_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("whatsapp_sessions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    processing_job_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("processing_jobs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    linked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    consent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    captured_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    biometric_metadata: Mapped[list[KioskBiometricMetadata]] = relationship(
+        back_populates="session", cascade="all, delete-orphan", lazy="noload"
+    )
+    clinical_result: Mapped[KioskClinicalResult | None] = relationship(
+        back_populates="session", cascade="all, delete-orphan", lazy="noload"
+    )
+    result_tokens: Mapped[list[KioskResultToken]] = relationship(
+        back_populates="session", cascade="all, delete-orphan", lazy="noload"
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_kiosk_sessions_verification_nonce",
+            "verification_nonce",
+            unique=True,
+        ),
+        Index(
+            "ix_kiosk_sessions_status_expires_at",
+            "status",
+            "expires_at",
+        ),
+        Index("ix_kiosk_sessions_user_id", "user_id"),
+        Index("ix_kiosk_sessions_kiosk_id", "kiosk_id"),
+    )
+
+
+class KioskBiometricMetadata(Base):
+    """Derived acquisition-quality signals for a kiosk capture — never frames.
+
+    The minimise posture: raw face frames are processed in-memory and discarded;
+    only these quality scalars and any error flags persist.
+    """
+
+    __tablename__ = "kiosk_biometric_metadata"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=func.gen_random_uuid(),
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("kiosk_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    signal_quality_index: Mapped[float | None] = mapped_column(Float, nullable=True)
+    illumination_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    face_bbox_ratio: Mapped[float | None] = mapped_column(Float, nullable=True)
+    frame_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
+    error_flags: Mapped[list[str]] = mapped_column(
+        ARRAY(String(64)), nullable=False, default=list, server_default="{}"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    session: Mapped[KioskSession] = relationship(back_populates="biometric_metadata")
+
+    __table_args__ = (
+        Index("ix_kiosk_biometric_metadata_session_id", "session_id"),
+        CheckConstraint(
+            "(signal_quality_index IS NULL OR "
+            "(signal_quality_index >= 0 AND signal_quality_index <= 1)) AND "
+            "(illumination_score IS NULL OR "
+            "(illumination_score >= 0 AND illumination_score <= 1)) AND "
+            "(face_bbox_ratio IS NULL OR "
+            "(face_bbox_ratio >= 0 AND face_bbox_ratio <= 1))",
+            name="ck_kiosk_biometric_metadata_scores_unit",
+        ),
+        CheckConstraint(
+            "frame_count >= 0",
+            name="ck_kiosk_biometric_metadata_frame_count_nonneg",
+        ),
+    )
+
+
+class KioskClinicalResult(Base):
+    """The kiosk triage summary, encrypted at rest with AES-256-GCM.
+
+    Plaintext never touches the database: ``encrypted_payload`` is the GCM
+    ciphertext (auth tag included), ``encryption_nonce`` the 96-bit nonce, and
+    ``key_id`` the externally-managed key version (for rotation). One per session.
+    """
+
+    __tablename__ = "kiosk_clinical_results"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=func.gen_random_uuid(),
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("kiosk_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    encrypted_payload: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    encryption_nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    session: Mapped[KioskSession] = relationship(back_populates="clinical_result")
+    tokens: Mapped[list[KioskResultToken]] = relationship(
+        back_populates="result", cascade="all, delete-orphan", lazy="noload"
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_kiosk_clinical_results_session_id",
+            "session_id",
+            unique=True,
+        ),
+    )
+
+
+class KioskResultToken(Base):
+    """Single-use, OTP-gated, 24h access credential for the result portal.
+
+    Only hashes are stored: ``token_hash`` (SHA-256 of the opaque URL token) and
+    ``otp_hash`` (argon2 of the 4-digit second factor). The bounded attempt
+    counter makes the 10k OTP space non-brute-forceable; ``consumed_at`` enforces
+    single use; ``expires_at`` is exactly 24h after generation.
+    """
+
+    __tablename__ = "kiosk_result_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=func.gen_random_uuid(),
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("kiosk_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    result_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("kiosk_clinical_results.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    token_hash: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    otp_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    otp_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
+    max_otp_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="5"
+    )
+    consumed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    session: Mapped[KioskSession] = relationship(back_populates="result_tokens")
+    result: Mapped[KioskClinicalResult] = relationship(back_populates="tokens")
+
+    __table_args__ = (
+        Index("ix_kiosk_result_tokens_token_hash", "token_hash", unique=True),
+        Index("ix_kiosk_result_tokens_session_id", "session_id"),
+        Index("ix_kiosk_result_tokens_expires_at", "expires_at"),
+        CheckConstraint(
+            "otp_attempts >= 0 AND otp_attempts <= max_otp_attempts + 1",
+            name="ck_kiosk_result_tokens_attempts_bounded",
         ),
     )

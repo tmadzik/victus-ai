@@ -19,6 +19,7 @@ from victus_api.db.models import (
     AuditAction,
     ConsentRecord,
     ErasureRequest,
+    KioskSession,
     RefreshToken,
     RppgCalibrationRecord,
     StudySession,
@@ -259,6 +260,13 @@ async def _execute_account_erasure(
             delete(WhatsAppSession).where(WhatsAppSession.user_id == target_user.id)
         )
     ).rowcount
+    # Kiosk rail: delete the participant's kiosk sessions, which cascade to their
+    # biometric metadata, encrypted result payloads and access tokens.
+    kiosk_sessions_deleted = (
+        await db.execute(
+            delete(KioskSession).where(KioskSession.user_id == target_user.id)
+        )
+    ).rowcount
 
     target_user.email = tombstone_email(target_user.id)
     target_user.full_name = tombstone_name()
@@ -284,6 +292,7 @@ async def _execute_account_erasure(
             "subjects_anonymised": len(subject_rows),
             "whatsapp_jobs_scrubbed": jobs_scrubbed,
             "whatsapp_sessions_deleted": sessions_deleted,
+            "kiosk_sessions_deleted": kiosk_sessions_deleted,
             "retention_basis": retention_basis(request_row.jurisdiction),
         },
     )

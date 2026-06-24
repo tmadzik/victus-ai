@@ -46,6 +46,10 @@ class ConvState(str, enum.Enum):
     VIDEO = "VIDEO"
     COMPLETE = "COMPLETE"
     DECLINED = "DECLINED"
+    # Kiosk-linked branch: the phone scanned a terminal QR, so it only needs to
+    # grant consent — the capture happens at the kiosk, not over WhatsApp. Driven
+    # by the WhatsApp service (it needs the DB), not the pure FSM.
+    KIOSK_CONSENT = "KIOSK_CONSENT"
 
 
 # Six-question behavioural/symptom audit. ``kind`` routes a "yes" into the

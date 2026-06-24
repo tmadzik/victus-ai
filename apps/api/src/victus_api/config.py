@@ -14,6 +14,10 @@ from typing import Literal
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Well-known development AES-256 key (32 zero bytes, hex). The production guard
+# refuses to boot if the kiosk key is still this placeholder.
+KIOSK_DEV_ENCRYPTION_KEY = "00" * 32
+
 
 def _repo_root() -> Path:
     here = Path(__file__).resolve()
@@ -99,8 +103,31 @@ class Settings(BaseSettings):
         ),
     )
     notify_webhook_timeout_s: float = Field(default=4.0, ge=0.5, le=30.0)
-    # Base URL the in-app deep links resolve against in webhook payloads.
+    # Base URL the in-app deep links resolve against in webhook payloads. Also
+    # the host the kiosk secure-result portal links resolve against.
     web_app_base_url: str = "http://localhost:3000"
+
+    # --- Mobile Clinic Gateway (kiosk rail) ----------------------------------
+    # AES-256 key for the kiosk clinical-result envelope, supplied externally
+    # (secrets file / host env) — 64 hex chars or base64 decoding to 32 bytes.
+    # MUST be overridden outside development; the prod guard rejects the default.
+    kiosk_encryption_key: SecretStr = Field(
+        default=SecretStr(KIOSK_DEV_ENCRYPTION_KEY),
+        description="External AES-256-GCM key for kiosk result payloads.",
+    )
+    # Version label for the active key, stamped on every ciphertext so a future
+    # rotation can still resolve which key decrypts an older row.
+    kiosk_key_id: str = Field(default="kiosk-dev-1", max_length=64)
+    # Overall kiosk session lifetime (the 30s inactivity purge is a frontend
+    # concern; this is the server-side hard ceiling on an unfinished session).
+    kiosk_session_ttl_seconds: int = Field(default=900, ge=60, le=3_600)
+    # Secure-result token lifetime — the spec mandates exactly 24h.
+    kiosk_result_token_ttl_seconds: int = Field(
+        default=86_400, ge=300, le=604_800
+    )
+    # Wrong-OTP attempts before the result token is permanently locked. Bounds
+    # the 10k 4-digit space to a non-brute-forceable handful of tries.
+    kiosk_otp_max_attempts: int = Field(default=5, ge=3, le=10)
 
     @field_validator("database_url")
     @classmethod
@@ -134,6 +161,8 @@ class Settings(BaseSettings):
             raise RuntimeError("INTERNAL_SERVICE_TOKEN is still the development placeholder")
         if "replace" in self.pseudo_salt.get_secret_value().lower():
             raise RuntimeError("PSEUDO_SALT is still the development placeholder")
+        if self.kiosk_encryption_key.get_secret_value() == KIOSK_DEV_ENCRYPTION_KEY:
+            raise RuntimeError("KIOSK_ENCRYPTION_KEY is still the development placeholder")
 
 
 @lru_cache(maxsize=1)

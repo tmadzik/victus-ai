@@ -21,6 +21,12 @@ const serverEnvSchema = z.object({
     .transform((v) => v === 'true' || v === '1'),
   INTERNAL_API_BASE_URL: z.string().url(),
   INTERNAL_SERVICE_TOKEN: z.string().min(16),
+  // Kiosk terminal identity for this deployment. The Next.js server holds the
+  // device token (never the browser) and forwards it to FastAPI as
+  // X-Kiosk-Id / X-Kiosk-Token. Optional: unset disables the kiosk rail on
+  // this instance (the route handlers return 503).
+  KIOSK_ID: z.string().optional(),
+  KIOSK_DEVICE_TOKEN: z.string().optional(),
 });
 
 export const publicEnv = publicEnvSchema.parse({
@@ -50,6 +56,8 @@ function loadServerEnv(): z.infer<typeof serverEnvSchema> {
     INTERNAL_SERVICE_TOKEN:
       process.env.INTERNAL_SERVICE_TOKEN ??
       (skipServerEnvValidation ? 'x'.repeat(16) : undefined),
+    KIOSK_ID: process.env.KIOSK_ID,
+    KIOSK_DEVICE_TOKEN: process.env.KIOSK_DEVICE_TOKEN,
   });
 }
 
