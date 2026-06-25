@@ -89,6 +89,23 @@ class LabelDistribution(BaseModel):
     diabetes: dict[str, int]
 
 
+class ResearchImportError(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    row: int  # zero-based index in the submitted batch
+    error: str
+
+
+class ResearchImportSummary(BaseModel):
+    """Outcome of a REDCap/ODK/CSV import — per-row successes and failures."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    imported: int
+    failed: int
+    errors: list[ResearchImportError]
+
+
 class ResearchCorpusStats(BaseModel):
     """Funder-facing snapshot of the labelled triage corpus."""
 

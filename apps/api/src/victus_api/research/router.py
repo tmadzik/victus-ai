@@ -11,15 +11,17 @@ import json
 from collections.abc import AsyncIterator
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import StreamingResponse
 
 from victus_api.core.deps import DbSession, require_role
 from victus_api.db.models import User, UserRole
+from victus_api.research.importer import import_rows, parse_csv
 from victus_api.research.schemas import (
     ResearchCaseCreate,
     ResearchCaseResponse,
     ResearchCorpusStats,
+    ResearchImportSummary,
 )
 from victus_api.research.service import (
     corpus_stats,
@@ -46,6 +48,21 @@ async def create_case(
     payload: ResearchCaseCreate, user: Researcher, db: DbSession
 ) -> ResearchCaseResponse:
     return await create_research_case(db, payload=payload, created_by=user)
+
+
+@router.post(
+    "/triage-cases/import",
+    response_model=ResearchImportSummary,
+    summary="Bulk-import a REDCap/ODK/CSV field-study export into the corpus.",
+)
+async def import_cases(
+    request: Request, user: Researcher, db: DbSession
+) -> ResearchImportSummary:
+    """Accepts a CSV body (REDCap/ODK export). Labels are auto-derived per row;
+    invalid rows are reported individually without aborting the batch."""
+    text = (await request.body()).decode("utf-8", errors="replace")
+    rows = parse_csv(text)
+    return await import_rows(db, raw_rows=rows, created_by=user)
 
 
 @router.get("/triage-cases", response_model=list[ResearchCaseResponse])

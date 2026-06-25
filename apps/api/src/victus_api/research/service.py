@@ -131,7 +131,11 @@ def _resolve(
 
 
 async def create_research_case(
-    db: AsyncSession, *, payload: ResearchCaseCreate, created_by: User
+    db: AsyncSession,
+    *,
+    payload: ResearchCaseCreate,
+    created_by: User,
+    site_code: str | None = None,
 ) -> ResearchCaseResponse:
     bmi = _bmi(payload.height_cm, payload.weight_kg)
     basis: dict[str, str] = {}
@@ -159,7 +163,9 @@ async def create_research_case(
         created_by_user_id=created_by.id,
         study_subject_id=payload.study_subject_id,
         capture_domain=payload.capture_domain.value,
-        site_code=created_by.site_code,
+        # Imported field-study rows carry their own site (the study spans SA+NG);
+        # interactive console entries default to the creator's deployment site.
+        site_code=site_code or created_by.site_code,
         age_years=payload.age_years,
         sex=payload.sex.value,
         height_cm=payload.height_cm,

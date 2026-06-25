@@ -5,7 +5,7 @@
 Dual-pathway NCD risk prediction and Transdermal Optical Imaging biomarker platform engineered for clinical-validation deployment in Sub-Saharan African settings.
 
 - **Pathway A — 3B-Triage:** Non-clinical NCD risk screening (Obesity / Hypertension / Diabetes) via tape-measure inputs and symptom audit. Dirichlet-EDL classifier with a gradient-reversal domain adversary trained to be invariant across `{CLINICAL_GRADE, CHW_TAPE_MEASURE, SYNTHETIC}` measurement provenance — tape-measure inputs collected by community health workers behave the same as clinical-grade inputs by construction. Epistemic/aleatoric uncertainty drives a strict GREEN / YELLOW / RED state machine. Hard-coded deterministic safety overrides (polydipsia, blurred vision, non-healing foot sores) bypass the network and escalate to RED.
-- **Pathway B — TOI:** Transdermal Optical Imaging + rPPG biomarker extraction (HR, RR, BP, HRV, Stress, CVD risk, Stroke risk, BMI) tuned for Fitzpatrick III–VI via CHROM / POS chrominance pipelines.
+- **Pathway B — TOI:** Transdermal Optical Imaging + rPPG biomarker extraction via CHROM / POS chrominance pipelines, tuned for Fitzpatrick III–VI. **Validated outputs: heart rate and respiratory rate.** HRV and a derived stress index are flagged `experimental` and gated off by default (`TOI_EXPOSE_EXPERIMENTAL_BIOMARKERS`). Blood pressure / CVD-risk / stroke-risk / BMI from face video are **not** produced — they have no single-camera ground truth and remain out of scope pending validated methodology.
 
 ## Architecture
 
