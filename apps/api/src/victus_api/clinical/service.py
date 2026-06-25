@@ -8,11 +8,13 @@ the access itself, which is logged via ``CLINICIAN_PARTICIPANT_VIEWED``.
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from victus_api.audit.service import write_audit
+from victus_api.clinical.report import build_participant_report_pdf
 from victus_api.clinical.schemas import ParticipantHistory, ParticipantSummary
 from victus_api.core.exceptions import NotFoundError
 from victus_api.db.models import AuditAction, ToiAssessment, TriageAssessment, User
@@ -103,6 +105,20 @@ async def search_participants(
     return summaries
 
 
+async def _build_history(
+    db: AsyncSession, user_id: uuid.UUID, limit: int
+) -> tuple[User, ParticipantHistory]:
+    """Fetch a participant's identified record (no audit — callers audit)."""
+    user = await db.get(User, user_id)
+    if user is None:
+        raise NotFoundError("Participant not found.")
+    capped = min(limit, _MAX_HISTORY)
+    triage = await list_triage(db, user_id=user_id, limit=capped)
+    toi = await list_toi(db, user_id=user_id, limit=capped)
+    summary = await _summary(db, user)
+    return user, ParticipantHistory(participant=summary, triage=triage, toi=toi)
+
+
 async def get_participant_history(
     db: AsyncSession,
     *,
@@ -113,14 +129,7 @@ async def get_participant_history(
     user_agent: str | None,
 ) -> ParticipantHistory:
     """Return a participant's identified assessment record. The access is audited."""
-    user = await db.get(User, user_id)
-    if user is None:
-        raise NotFoundError("Participant not found.")
-
-    capped = min(limit, _MAX_HISTORY)
-    triage = await list_triage(db, user_id=user_id, limit=capped)
-    toi = await list_toi(db, user_id=user_id, limit=capped)
-    summary = await _summary(db, user)
+    _user, history = await _build_history(db, user_id, limit)
 
     await write_audit(
         db,
@@ -132,8 +141,41 @@ async def get_participant_history(
         metadata={
             "mode": "view",
             "participant_id": str(user_id),
-            "triage_count": summary.triage_count,
-            "toi_count": summary.toi_count,
+            "triage_count": history.participant.triage_count,
+            "toi_count": history.participant.toi_count,
         },
     )
-    return ParticipantHistory(participant=summary, triage=triage, toi=toi)
+    return history
+
+
+async def export_participant_report(
+    db: AsyncSession,
+    *,
+    actor: User,
+    user_id: uuid.UUID,
+    limit: int,
+    ip_address: str | None,
+    user_agent: str | None,
+) -> bytes:
+    """Build the participant-record PDF. The export is audited as an access event."""
+    _user, history = await _build_history(db, user_id, limit)
+    pdf = build_participant_report_pdf(
+        history, generated_by=actor, generated_at=datetime.now(UTC)
+    )
+
+    await write_audit(
+        db,
+        action=AuditAction.CLINICIAN_PARTICIPANT_VIEWED,
+        actor_id=actor.id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        resource=f"clinical:participant:{user_id}",
+        metadata={
+            "mode": "export",
+            "format": "pdf",
+            "participant_id": str(user_id),
+            "triage_count": history.participant.triage_count,
+            "toi_count": history.participant.toi_count,
+        },
+    )
+    return pdf

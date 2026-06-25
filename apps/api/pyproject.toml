@@ -25,6 +25,9 @@ dependencies = [
     "slowapi>=0.1.9",
     "httpx>=0.28.0",
     "orjson>=3.10.12",
+    # Server-side clinician PDF export. Pure-Python manylinux wheel (no system
+    # cairo/pango), so it installs cleanly on cPanel shared hosting.
+    "reportlab>=4.2.0",
     # Pathway B rPPG signal processing is part of the runtime contract,
     # not an optional research extra, so numpy/scipy ship with the wheel.
     "numpy>=2.1.3",
