@@ -11,6 +11,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from victus_api.audit.service import write_audit
+from victus_api.config import get_settings
 from victus_api.core.logging import get_logger
 from victus_api.db.models import (
     AuditAction,
@@ -172,7 +173,7 @@ async def assess_toi(
 
     return _to_response(
         row=row,
-        biomarkers=biomarkers_dto,
+        biomarkers=_visible_biomarkers(biomarkers_dto),
         signal_quality=signal_quality,
         pipeline=pipeline,
     )
@@ -264,19 +265,41 @@ def _build_biomarker_dto(
             else None,
             unit="breaths/min",
         )
+    # HRV (short-window rPPG) and the derived stress index are not validated
+    # against ECG/clinical references — flag them experimental so they can be
+    # gated out of participant- and clinician-facing surfaces by default.
     if pipeline.hrv_rmssd_ms is not None:
         out["hrv_rmssd"] = BiomarkerEstimate(
-            value=pipeline.hrv_rmssd_ms, unit="ms"
+            value=pipeline.hrv_rmssd_ms, unit="ms", experimental=True
         )
     if pipeline.hrv_sdnn_ms is not None:
         out["hrv_sdnn"] = BiomarkerEstimate(
-            value=pipeline.hrv_sdnn_ms, unit="ms"
+            value=pipeline.hrv_sdnn_ms, unit="ms", experimental=True
         )
     if pipeline.stress_index is not None:
         out["stress_index"] = BiomarkerEstimate(
-            value=pipeline.stress_index, unit="index", ci_low=0.0, ci_high=100.0
+            value=pipeline.stress_index,
+            unit="index",
+            ci_low=0.0,
+            ci_high=100.0,
+            experimental=True,
         )
     return out
+
+
+def _visible_biomarkers(
+    biomarkers: dict[str, BiomarkerEstimate],
+) -> dict[str, BiomarkerEstimate]:
+    """Drop experimental biomarkers unless explicitly exposed (research mode).
+
+    Validated estimates (HR, RR) always pass; experimental ones (HRV, stress)
+    are withheld by default so the product never presents an unvalidated number
+    as a measurement. ``TOI_EXPOSE_EXPERIMENTAL_BIOMARKERS=1`` re-enables them
+    for research/validation builds.
+    """
+    if get_settings().toi_expose_experimental_biomarkers:
+        return biomarkers
+    return {k: v for k, v in biomarkers.items() if not v.experimental}
 
 
 def _to_response(
@@ -316,7 +339,7 @@ def _row_to_response(row: ToiAssessmentRow) -> ToiAssessmentResponse:
         duration_s=row.duration_s,
         sample_rate_hz=row.sample_rate_hz,
         frame_count=row.frame_count,
-        biomarkers=biomarkers,
+        biomarkers=_visible_biomarkers(biomarkers),
         signal_quality=SignalQuality.model_validate(
             {
                 "snr_chrom_db": sq_data.get("snr_chrom_db", row.snr_chrom_db),

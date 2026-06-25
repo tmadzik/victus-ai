@@ -168,17 +168,28 @@ measurement protocols. The exposure is in the **ML methodology and the claims**.
 
 ---
 
-## 5. Recommended minimal additions (in priority order)
+## 5. Recommended minimal additions — status
 
-1. **Define the predictive tasks** precisely (inputs allowed per target; exclude
-   defining measurements) — eliminates the label-leakage finding. *(spec, ~0 code)*
-2. **Field-study import bridge** REDCap/ODK/CSV → `research_triage_cases`. *(pipeline)*
-3. **Validation harness:** documented splits incl. site- and country-held-out;
-   calibration metrics (ECE, Bland-Altman LoA); model cards. *(eval code)*
-4. **Gate/relabel the unvalidated TOI biomarkers** (BP/CVD/stroke/BMI) behind an
-   explicit research-only flag until validated. *(small change)*
-5. **Prospective kiosk validation** plan: link a sample of kiosk users to later
-   facility-confirmed outcomes to actually close the improvement loop. *(study)*
+All five are addressed in this change set (the prospective study is a protocol,
+the rest are code):
 
-None of the above require a *new model for data gathering*; they harden the
-methodology around the data the Brief already defines.
+1. ✅ **Predictive tasks defined + leakage guard** — `triage/tasks.py` declares,
+   per disease, the task kind and the forbidden (label-defining) features, with a
+   `mask_vector` the training/inference paths apply so a head never sees its own
+   defining measurement. Unit-tested.
+2. ✅ **Field-study import bridge** — `research/importer.py` +
+   `POST /research/triage-cases/import` (REDCap/ODK/CSV → `research_triage_cases`,
+   alias-tolerant, per-row error reporting, reuses label auto-derivation).
+3. ✅ **Validation/calibration harness + model cards** — `training/evaluation.py`
+   (ROC-AUC, Brier, ECE, reliability, Bland-Altman LoA, group-held-out split) and
+   `training/model_card.py`. Pure-function metrics unit-tested.
+4. ✅ **TOI biomarkers gated** — HRV + stress flagged `experimental` and withheld
+   by default (`TOI_EXPOSE_EXPERIMENTAL_BIOMARKERS`); README corrected (BP/CVD/
+   stroke/BMI are not produced).
+5. ✅ **Prospective kiosk validation** — protocol in
+   [PROSPECTIVE_VALIDATION_PLAN.md](PROSPECTIVE_VALIDATION_PLAN.md) (linkage,
+   reference standards, calibration/agreement analysis, exit criteria). The
+   one-column linkage build is intentionally deferred to the study/ethics design.
+
+None required a *new model for data gathering*; they harden the methodology
+around the data the Brief already defines.

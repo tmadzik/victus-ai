@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     api_port: int = 8000
     api_log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
 
+    # Expose experimental, not-yet-validated TOI biomarkers (HRV, stress index)
+    # in API responses. OFF by default: the product must not present an
+    # unvalidated estimate as a measurement. Enable only for research/validation.
+    toi_expose_experimental_biomarkers: bool = False
+
     # Deployment site / country for this instance (e.g. "ZW", "NG"). Each pilot
     # runs as its own deployment; new participants and research cases are stamped
     # with it for residency partitioning and per-site analytics/calibration.
