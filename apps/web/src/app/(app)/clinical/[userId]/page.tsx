@@ -83,9 +83,14 @@ export default async function ParticipantRecordPage({
             {p.is_active ? '' : ' · inactive'}
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-3 text-right">
-          <Stat label="Triage" value={String(p.triage_count)} />
-          <Stat label="TOI" value={String(p.toi_count)} />
+        <div className="flex flex-col items-end gap-3">
+          <div className="grid grid-cols-2 gap-3 text-right">
+            <Stat label="Triage" value={String(p.triage_count)} />
+            <Stat label="TOI" value={String(p.toi_count)} />
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <a href={`/api/clinical/${userId}/report`}>Download PDF</a>
+          </Button>
         </div>
       </header>
 

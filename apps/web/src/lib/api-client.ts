@@ -749,6 +749,42 @@ export const apiClient = {
     );
     return KioskResultPayloadSchema.parse(raw);
   },
+
+  /** Download a participant's record as PDF (clinician/admin). Raw bytes —
+   *  the JSON ``request`` helper can't carry a binary body. */
+  async getParticipantReportPdf(
+    accessToken: string,
+    userId: string,
+  ): Promise<{ bytes: ArrayBuffer; filename: string }> {
+    const response = await fetch(
+      `${serverEnv.INTERNAL_API_BASE_URL}/clinical/participants/${userId}/report.pdf`,
+      {
+        headers: {
+          Accept: 'application/pdf',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        cache: 'no-store',
+      },
+    );
+    if (!response.ok) {
+      let code = 'unknown_error';
+      let message = response.statusText || 'PDF export failed.';
+      try {
+        const parsed = ApiErrorSchema.safeParse(await response.json());
+        if (parsed.success) {
+          code = parsed.data.error.code;
+          message = parsed.data.error.message;
+        }
+      } catch {
+        /* non-JSON error body — keep the generic message */
+      }
+      throw new ApiError(response.status, code, message);
+    }
+    const disposition = response.headers.get('content-disposition') ?? '';
+    const match = /filename="?([^"]+)"?/.exec(disposition);
+    const filename = match?.[1] ?? `participant-${userId}.pdf`;
+    return { bytes: await response.arrayBuffer(), filename };
+  },
 };
 
 export { ApiError };
