@@ -87,6 +87,16 @@ export function TriageResultCard({
         <p className="text-sm text-brand-700">{tr.summaryTitle}</p>
       </div>
 
+      {/* Clinical-claims gate — when the deployment is a research demonstrator,
+          the risk states below are unvalidated model output and must not be
+          acted on. This banner is the enforced, visible expression of that. */}
+      {!assessment.clinical_claims_authorised ? (
+        <Alert tone="warning">
+          <AlertTitle>Research demonstrator — not a clinical result</AlertTitle>
+          <AlertDescription>{assessment.disclaimer}</AlertDescription>
+        </Alert>
+      ) : null}
+
       {/* ---- Overall summary banner ---- */}
       <Card className={cn('border-l-4', STATE_ACCENT[assessment.overall_state])}>
         <CardHeader>

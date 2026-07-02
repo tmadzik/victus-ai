@@ -303,6 +303,18 @@ export const PerDiseaseRiskSchema = z.object({
 });
 export type PerDiseaseRisk = z.infer<typeof PerDiseaseRiskSchema>;
 
+/**
+ * Clinical-claims gate. Until the model passes prospective validation on the
+ * deployed population, a deployment runs as a RESEARCH_DEMONSTRATOR and its risk
+ * states must NOT be presented as an actionable clinical result.
+ */
+export const ClaimsMode = {
+  CLINICAL: 'CLINICAL',
+  RESEARCH_DEMONSTRATOR: 'RESEARCH_DEMONSTRATOR',
+} as const;
+export type ClaimsMode = (typeof ClaimsMode)[keyof typeof ClaimsMode];
+export const ClaimsModeSchema = z.nativeEnum(ClaimsMode);
+
 export const TriageAssessmentResponseSchema = z.object({
   id: z.string().uuid(),
   /** Worst of the per-disease states; RED whenever a safety override fires. */
@@ -321,6 +333,16 @@ export const TriageAssessmentResponseSchema = z.object({
   /** "trained_torch_dann_multihead_v1" once a checkpoint ships; "rule_based_fallback_v1" otherwise. */
   model_kind: z.string(),
   next_action: z.string(),
+  /** Which claims mode the deployment is in (see {@link ClaimsMode}). */
+  claims_mode: ClaimsModeSchema,
+  /**
+   * False in RESEARCH_DEMONSTRATOR mode: the risk states are unvalidated model
+   * output and MUST NOT be shown as an actionable clinical result. Surfaces
+   * should render the research disclaimer and suppress clinical calls-to-action.
+   */
+  clinical_claims_authorised: z.boolean(),
+  /** Patient-facing disclaimer, already matched to the claims mode. */
+  disclaimer: z.string(),
   created_at: z.string(),
 });
 export type TriageAssessmentResponse = z.infer<typeof TriageAssessmentResponseSchema>;

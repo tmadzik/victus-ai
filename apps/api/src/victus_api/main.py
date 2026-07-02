@@ -47,7 +47,16 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings: Settings = get_settings()
     configure_logging(settings)
-    log.info("api_startup", env=settings.api_env, version=__version__)
+    log.info(
+        "api_startup",
+        env=settings.api_env,
+        version=__version__,
+        site_code=settings.site_code,
+        # Governance visibility: which claims mode this deployment boots in.
+        clinical_claims=(
+            "CLINICAL" if settings.clinical_claims_active else "RESEARCH_DEMONSTRATOR"
+        ),
+    )
     try:
         async with get_engine().connect() as conn:
             await conn.execute(text("SELECT 1"))
