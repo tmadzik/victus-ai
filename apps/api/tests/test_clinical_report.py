@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 
 from victus_api.clinical.report import build_participant_report_pdf
 from victus_api.clinical.schemas import ParticipantHistory, ParticipantSummary
+from victus_api.core.claims import ClaimsMode
 from victus_api.db.models import User, UserRole
 from victus_api.toi.schemas import (
     BiomarkerEstimate,
@@ -80,6 +81,9 @@ def _triage() -> TriageAssessmentResponse:
         override_reasons=["polydipsia_unquenchable_thirst"],
         model_kind="rule_based",
         next_action="Refer.",
+        claims_mode=ClaimsMode.CLINICAL,
+        clinical_claims_authorised=True,
+        disclaimer="This is a wellness screening, not a diagnosis.",
         created_at=datetime.now(UTC),
     )
 

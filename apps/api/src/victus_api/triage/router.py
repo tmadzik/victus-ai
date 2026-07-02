@@ -6,6 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request, status
 
+from victus_api.config import Settings, get_settings
 from victus_api.core.deps import CurrentUser, DbSession, require_consent, require_role
 from victus_api.db.models import ConsentType, UserRole
 from victus_api.triage.schemas import (
@@ -41,10 +42,16 @@ async def assess_endpoint(
         Depends(require_role(UserRole.PATIENT, UserRole.CHW, UserRole.CLINICIAN)),
     ],
     _consent: Annotated[CurrentUser, Depends(require_consent(ConsentType.TRIAGE))],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> TriageAssessmentResponse:
     ip, ua = _client_metadata(request)
     return await assess_triage(
-        db, user=user, payload=payload, ip_address=ip, user_agent=ua
+        db,
+        user=user,
+        payload=payload,
+        settings=settings,
+        ip_address=ip,
+        user_agent=ua,
     )
 
 
@@ -60,6 +67,9 @@ async def list_my_assessments(
         Depends(require_role(UserRole.PATIENT, UserRole.CHW, UserRole.CLINICIAN)),
     ],
     _consent: Annotated[CurrentUser, Depends(require_consent(ConsentType.TRIAGE))],
+    settings: Annotated[Settings, Depends(get_settings)],
     limit: Annotated[int, Query(ge=1, le=100)] = 25,
 ) -> list[TriageAssessmentResponse]:
-    return await list_assessments_for_user(db, user_id=user.id, limit=limit)
+    return await list_assessments_for_user(
+        db, user_id=user.id, settings=settings, limit=limit
+    )

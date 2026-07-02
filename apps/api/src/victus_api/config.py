@@ -47,6 +47,19 @@ class Settings(BaseSettings):
     # unvalidated estimate as a measurement. Enable only for research/validation.
     toi_expose_experimental_biomarkers: bool = False
 
+    # --- Clinical-claims gate --------------------------------------------------
+    # The platform must not present a model-derived NCD risk state as an
+    # actionable clinical result until the model has passed prospective
+    # validation on the deployed population (docs/PROSPECTIVE_VALIDATION_PLAN.md).
+    # The gate is OPEN only when BOTH are set: the operator explicitly enables
+    # clinical claims AND names the validated model card that authorises them.
+    # Default CLOSED → the platform runs as an honest research demonstrator.
+    clinical_claims_enabled: bool = False
+    # Identifier / path / attestation of the validated model card authorising
+    # clinical claims. Presence is required for the gate to open — enabling the
+    # flag alone is not enough.
+    clinical_claims_model_card: str | None = None
+
     # Deployment site / country for this instance (e.g. "ZW", "NG"). Each pilot
     # runs as its own deployment; new participants and research cases are stamped
     # with it for residency partitioning and per-site analytics/calibration.
@@ -155,6 +168,12 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.api_env == "production"
+
+    @property
+    def clinical_claims_active(self) -> bool:
+        """Clinical claims are authorised only when explicitly enabled AND a
+        validated model card is named. Either alone leaves the gate closed."""
+        return self.clinical_claims_enabled and bool(self.clinical_claims_model_card)
 
     def assert_safe_for_production(self) -> None:
         """Refuse to boot in production with dev-only secrets."""
