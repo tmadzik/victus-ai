@@ -24,6 +24,14 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from victus_api.audit.service import write_audit
+from victus_api.config import Settings
+from victus_api.core.claims import (
+    RESEARCH_NEXT_ACTION,
+    RESEARCH_PER_DISEASE_ACTION,
+    ClaimsMode,
+    disclaimer_for,
+    resolve_claims_mode,
+)
 from victus_api.core.logging import get_logger
 from victus_api.db.models import (
     AuditAction,
@@ -194,6 +202,7 @@ async def assess_triage(
     *,
     user: User,
     payload: TriageAssessmentRequest,
+    settings: Settings,
     ip_address: str | None,
     user_agent: str | None,
 ) -> TriageAssessmentResponse:
@@ -345,6 +354,7 @@ async def assess_triage(
         override_reasons=list(safety.reasons),
         model_kind=multi.model_kind,
         next_action=overall_next_action,
+        mode=resolve_claims_mode(settings),
     )
 
 
@@ -352,6 +362,7 @@ async def list_assessments_for_user(
     db: AsyncSession,
     *,
     user_id: uuid.UUID,
+    settings: Settings,
     limit: int = 25,
 ) -> list[TriageAssessmentResponse]:
     stmt = (
@@ -361,7 +372,8 @@ async def list_assessments_for_user(
         .limit(limit)
     )
     rows = (await db.scalars(stmt)).all()
-    return [_row_to_response(row) for row in rows]
+    mode = resolve_claims_mode(settings)
+    return [_row_to_response(row, mode=mode) for row in rows]
 
 
 # --- Helpers -----------------------------------------------------------------
@@ -437,6 +449,32 @@ def _jsonable_derived(derived: DerivedFromFeatures) -> dict[str, float | None]:
     }
 
 
+def _apply_gate(
+    *,
+    mode: ClaimsMode,
+    safety_triggered: bool,
+    next_action: str,
+    per_disease: list[PerDiseaseRisk],
+) -> tuple[bool, str, str, list[PerDiseaseRisk]]:
+    """Enforce the clinical-claims gate on a patient-facing result.
+
+    Returns ``(authorised, disclaimer, next_action, per_disease)``. In research
+    mode the model-derived actionable directives are stripped so no surface can
+    present the risk state as clinical advice — but a deterministic red-flag
+    safety override keeps its emergency guidance (conservative first-aid, not a
+    model claim).
+    """
+    disclaimer = disclaimer_for(mode)
+    if mode is ClaimsMode.CLINICAL:
+        return True, disclaimer, next_action, per_disease
+    gated_next = next_action if safety_triggered else RESEARCH_NEXT_ACTION
+    gated_pd = [
+        d.model_copy(update={"next_action": RESEARCH_PER_DISEASE_ACTION})
+        for d in per_disease
+    ]
+    return False, disclaimer, gated_next, gated_pd
+
+
 def _to_response(
     *,
     row: TriageAssessmentRow,
@@ -447,11 +485,18 @@ def _to_response(
     override_reasons: list[str],
     model_kind: str,
     next_action: str,
+    mode: ClaimsMode,
 ) -> TriageAssessmentResponse:
+    authorised, disclaimer, gated_next, gated_pd = _apply_gate(
+        mode=mode,
+        safety_triggered=row.safety_override_triggered,
+        next_action=next_action,
+        per_disease=per_disease_risks,
+    )
     return TriageAssessmentResponse(
         id=row.id,
         overall_state=overall_state,
-        per_disease=per_disease_risks,
+        per_disease=gated_pd,
         derived_features=DerivedSchema(
             bmi=derived.bmi,
             whtr=derived.whtr,
@@ -462,12 +507,17 @@ def _to_response(
         safety_override_triggered=row.safety_override_triggered,
         override_reasons=override_reasons,
         model_kind=model_kind,
-        next_action=next_action,
+        next_action=gated_next,
+        claims_mode=mode,
+        clinical_claims_authorised=authorised,
+        disclaimer=disclaimer,
         created_at=row.created_at,
     )
 
 
-def _row_to_response(row: TriageAssessmentRow) -> TriageAssessmentResponse:
+def _row_to_response(
+    row: TriageAssessmentRow, *, mode: ClaimsMode
+) -> TriageAssessmentResponse:
     per_disease = [
         PerDiseaseRisk.model_validate(entry) for entry in (row.per_disease_risks or [])
     ]
@@ -477,15 +527,24 @@ def _row_to_response(row: TriageAssessmentRow) -> TriageAssessmentResponse:
         whr=row.derived_features.get("whr"),
         pulse_pressure_mmhg=row.derived_features.get("pulse_pressure_mmhg"),
     )
+    authorised, disclaimer, gated_next, gated_pd = _apply_gate(
+        mode=mode,
+        safety_triggered=row.safety_override_triggered,
+        next_action="(historical)",
+        per_disease=per_disease,
+    )
     return TriageAssessmentResponse(
         id=row.id,
         overall_state=TriageState(row.state.value),
-        per_disease=per_disease,
+        per_disease=gated_pd,
         derived_features=derived,
         plausibility_flags=[PlausibilityFlag(f) for f in row.plausibility_flags],
         safety_override_triggered=row.safety_override_triggered,
         override_reasons=list(row.override_reasons),
         model_kind=row.model_kind,
-        next_action="(historical)",
+        next_action=gated_next,
+        claims_mode=mode,
+        clinical_claims_authorised=authorised,
+        disclaimer=disclaimer,
         created_at=row.created_at,
     )

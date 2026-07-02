@@ -16,6 +16,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from victus_api.core.claims import ClaimsMode
+
 # --- Enums kept in sync with packages/contracts and db.models -----------------
 
 
@@ -188,4 +190,12 @@ class TriageAssessmentResponse(BaseModel):
     override_reasons: list[str]
     model_kind: str
     next_action: str
+    # Clinical-claims gate. When ``clinical_claims_authorised`` is False the risk
+    # states are an unvalidated *research demonstrator* output: no surface may
+    # present them as an actionable clinical result, and ``next_action`` /
+    # ``disclaimer`` carry research-mode copy (deterministic red-flag safety
+    # guidance is preserved regardless — see core.claims).
+    claims_mode: ClaimsMode
+    clinical_claims_authorised: bool
+    disclaimer: str
     created_at: datetime

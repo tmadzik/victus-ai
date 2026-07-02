@@ -13,6 +13,7 @@ from victus_api.clinical.service import (
     get_participant_history,
     search_participants,
 )
+from victus_api.config import Settings, get_settings
 from victus_api.core.deps import CurrentUser, DbSession, require_role
 from victus_api.db.models import UserRole
 
@@ -59,11 +60,18 @@ async def history_endpoint(
     user: ClinicianUser,
     request: Request,
     user_id: uuid.UUID,
+    settings: Annotated[Settings, Depends(get_settings)],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> ParticipantHistory:
     ip, ua = _client_metadata(request)
     return await get_participant_history(
-        db, actor=user, user_id=user_id, limit=limit, ip_address=ip, user_agent=ua
+        db,
+        actor=user,
+        user_id=user_id,
+        limit=limit,
+        settings=settings,
+        ip_address=ip,
+        user_agent=ua,
     )
 
 
@@ -77,11 +85,18 @@ async def report_pdf_endpoint(
     user: ClinicianUser,
     request: Request,
     user_id: uuid.UUID,
+    settings: Annotated[Settings, Depends(get_settings)],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> Response:
     ip, ua = _client_metadata(request)
     pdf = await export_participant_report(
-        db, actor=user, user_id=user_id, limit=limit, ip_address=ip, user_agent=ua
+        db,
+        actor=user,
+        user_id=user_id,
+        limit=limit,
+        settings=settings,
+        ip_address=ip,
+        user_agent=ua,
     )
     filename = f"victus-participant-{str(user_id)[:8]}.pdf"
     return Response(

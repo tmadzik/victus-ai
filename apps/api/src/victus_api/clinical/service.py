@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from victus_api.audit.service import write_audit
 from victus_api.clinical.report import build_participant_report_pdf
 from victus_api.clinical.schemas import ParticipantHistory, ParticipantSummary
+from victus_api.config import Settings
 from victus_api.core.exceptions import NotFoundError
 from victus_api.db.models import AuditAction, ToiAssessment, TriageAssessment, User
 from victus_api.toi.service import list_assessments_for_user as list_toi
@@ -106,14 +107,19 @@ async def search_participants(
 
 
 async def _build_history(
-    db: AsyncSession, user_id: uuid.UUID, limit: int
+    db: AsyncSession, user_id: uuid.UUID, limit: int, settings: Settings
 ) -> tuple[User, ParticipantHistory]:
-    """Fetch a participant's identified record (no audit — callers audit)."""
+    """Fetch a participant's identified record (no audit — callers audit).
+
+    The triage assessments pass through the clinical-claims gate like every other
+    surface: a clinician reviewing an unvalidated-model deployment sees the same
+    research-demonstrator framing, not an authorised clinical result.
+    """
     user = await db.get(User, user_id)
     if user is None:
         raise NotFoundError("Participant not found.")
     capped = min(limit, _MAX_HISTORY)
-    triage = await list_triage(db, user_id=user_id, limit=capped)
+    triage = await list_triage(db, user_id=user_id, settings=settings, limit=capped)
     toi = await list_toi(db, user_id=user_id, limit=capped)
     summary = await _summary(db, user)
     return user, ParticipantHistory(participant=summary, triage=triage, toi=toi)
@@ -125,11 +131,12 @@ async def get_participant_history(
     actor: User,
     user_id: uuid.UUID,
     limit: int,
+    settings: Settings,
     ip_address: str | None,
     user_agent: str | None,
 ) -> ParticipantHistory:
     """Return a participant's identified assessment record. The access is audited."""
-    _user, history = await _build_history(db, user_id, limit)
+    _user, history = await _build_history(db, user_id, limit, settings)
 
     await write_audit(
         db,
@@ -154,11 +161,12 @@ async def export_participant_report(
     actor: User,
     user_id: uuid.UUID,
     limit: int,
+    settings: Settings,
     ip_address: str | None,
     user_agent: str | None,
 ) -> bytes:
     """Build the participant-record PDF. The export is audited as an access event."""
-    _user, history = await _build_history(db, user_id, limit)
+    _user, history = await _build_history(db, user_id, limit, settings)
     pdf = build_participant_report_pdf(
         history, generated_by=actor, generated_at=datetime.now(UTC)
     )
