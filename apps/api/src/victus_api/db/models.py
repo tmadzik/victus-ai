@@ -1535,3 +1535,77 @@ class KioskResultToken(Base):
             name="ck_kiosk_result_tokens_attempts_bounded",
         ),
     )
+
+
+class ParticipantProfile(Base):
+    """Front-of-platform enrollment record — captured before a participant
+    reaches either pathway (3B-Triage or TOI).
+
+    Holds identified special-category demographics: direct identifiers
+    (``full_name``, ``email``) plus self-reported ``race_ethnicity`` make this
+    IDENTIFIED data, guarded by RBAC and covered by account erasure (the
+    identifiers are tombstoned/nulled). The external patient/client ID is never
+    stored in the clear — only its salted one-way hash (``patient_id_hash``,
+    full SHA-256 hex over ``{raw}:{pseudo_salt}``). Granular consent lives in
+    ``consent_records``; this row marks enrollment complete and stamps the
+    governing ``jurisdiction`` derived from ``region``. Adults only — the
+    ``age_range`` vocabulary starts at 18 (enforced at the API).
+    """
+
+    __tablename__ = "participant_profiles"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=func.gen_random_uuid(),
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    # Direct identifiers — tombstoned on erasure.
+    full_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    # Salted one-way hash of the external patient/client id (never plaintext).
+    patient_id_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Age band (adults only, e.g. "18-29" … "70+"); validated at the API.
+    age_range: Mapped[str] = mapped_column(String(16), nullable=False)
+    biological_sex: Mapped[SexAtBirth] = mapped_column(
+        SAEnum(
+            SexAtBirth,
+            name="sex_assigned_at_birth",
+            native_enum=True,
+            create_type=False,
+        ),
+        nullable=False,
+    )
+    region: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Self-reported, optional; distinct from the (physiological) Fitzpatrick
+    # scale used by the TOI pipeline. For equity reporting only.
+    race_ethnicity: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Governing data-protection regime stamped from region (NDPA/CDPA/POPIA/OTHER).
+    jurisdiction: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="OTHER"
+    )
+    enrolled_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    erased_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    __table_args__ = (
+        Index("ix_participant_profiles_user_id", "user_id", unique=True),
+        Index("ix_participant_profiles_patient_id_hash", "patient_id_hash"),
+    )

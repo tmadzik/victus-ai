@@ -1236,3 +1236,68 @@ export const KioskResultPayloadSchema = z.object({
   generated_at: z.string(),
 });
 export type KioskResultPayload = z.infer<typeof KioskResultPayloadSchema>;
+
+// ===========================================================================
+// ENROLLMENT (front-of-platform participant intake)
+// ===========================================================================
+
+/** Adult age bands (no under-18 — enrollment is adults only). */
+export const AgeRange = {
+  A18_29: '18-29',
+  A30_39: '30-39',
+  A40_49: '40-49',
+  A50_59: '50-59',
+  A60_69: '60-69',
+  A70_PLUS: '70+',
+} as const;
+export type AgeRange = (typeof AgeRange)[keyof typeof AgeRange];
+export const AgeRangeSchema = z.nativeEnum(AgeRange);
+
+/** Enrollment region — drives the governing data-protection jurisdiction. */
+export const EnrollmentRegion = {
+  NG: 'NG',
+  ZW: 'ZW',
+  ZA: 'ZA',
+  OTHER: 'OTHER',
+} as const;
+export type EnrollmentRegion =
+  (typeof EnrollmentRegion)[keyof typeof EnrollmentRegion];
+export const EnrollmentRegionSchema = z.nativeEnum(EnrollmentRegion);
+
+export const EnrollmentRequestSchema = z.object({
+  full_name: z.string().min(1).max(200),
+  email: z.string().email(),
+  patient_id: z.string().min(1).max(128),
+  age_range: AgeRangeSchema,
+  biological_sex: SexAtBirthSchema,
+  region: EnrollmentRegionSchema,
+  race_ethnicity: z.string().max(64).nullable().optional(),
+  consent_triage: z.boolean(),
+  consent_toi_imaging: z.boolean(),
+  consent_research: z.boolean().default(false),
+});
+export type EnrollmentRequest = z.infer<typeof EnrollmentRequestSchema>;
+
+export const EnrollmentStatusResponseSchema = z.object({
+  enrolled: z.boolean(),
+  has_profile: z.boolean(),
+  missing_consents: z.array(z.string()),
+});
+export type EnrollmentStatusResponse = z.infer<
+  typeof EnrollmentStatusResponseSchema
+>;
+
+export const EnrollmentProfileSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  full_name: z.string().nullable(),
+  email: z.string().nullable(),
+  patient_id_hash: z.string().nullable(),
+  age_range: z.string(),
+  biological_sex: z.string(),
+  region: z.string(),
+  race_ethnicity: z.string().nullable(),
+  jurisdiction: z.string(),
+  enrolled_at: z.string(),
+});
+export type EnrollmentProfile = z.infer<typeof EnrollmentProfileSchema>;

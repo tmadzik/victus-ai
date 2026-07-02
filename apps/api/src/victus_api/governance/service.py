@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import delete, desc, func, select
+from sqlalchemy import delete, desc, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from victus_api.audit.service import write_audit
@@ -20,6 +20,7 @@ from victus_api.db.models import (
     ConsentRecord,
     ErasureRequest,
     KioskSession,
+    ParticipantProfile,
     RefreshToken,
     RppgCalibrationRecord,
     StudySession,
@@ -267,6 +268,22 @@ async def _execute_account_erasure(
             delete(KioskSession).where(KioskSession.user_id == target_user.id)
         )
     ).rowcount
+    # Enrollment profile: drop the direct identifiers (name/email), the
+    # self-reported race/ethnicity, and the external-id hash; keep only the
+    # de-identified strata (age band, sex, region, jurisdiction) for research.
+    profiles_scrubbed = (
+        await db.execute(
+            update(ParticipantProfile)
+            .where(ParticipantProfile.user_id == target_user.id)
+            .values(
+                full_name=None,
+                email=None,
+                race_ethnicity=None,
+                patient_id_hash=None,
+                erased_at=now,
+            )
+        )
+    ).rowcount
 
     target_user.email = tombstone_email(target_user.id)
     target_user.full_name = tombstone_name()
@@ -293,6 +310,7 @@ async def _execute_account_erasure(
             "whatsapp_jobs_scrubbed": jobs_scrubbed,
             "whatsapp_sessions_deleted": sessions_deleted,
             "kiosk_sessions_deleted": kiosk_sessions_deleted,
+            "enrollment_profiles_scrubbed": profiles_scrubbed,
             "retention_basis": retention_basis(request_row.jurisdiction),
         },
     )
