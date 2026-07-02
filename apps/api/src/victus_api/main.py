@@ -23,6 +23,7 @@ from victus_api.config import Settings, get_settings
 from victus_api.core.exceptions import register_exception_handlers
 from victus_api.core.logging import configure_logging, get_logger, request_id_var
 from victus_api.db.session import dispose_engine, get_engine
+from victus_api.enrollment.router import router as enrollment_router
 from victus_api.governance.admin_router import router as governance_admin_router
 from victus_api.governance.router import router as governance_router
 from victus_api.kiosk.router import router as kiosk_router
@@ -125,6 +126,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth_router)
     app.include_router(users_router)
+    app.include_router(enrollment_router)
     app.include_router(pathways_router)
     app.include_router(triage_router)
     app.include_router(toi_router)

@@ -22,6 +22,11 @@ import {
   KioskResultGateResponseSchema,
   type KioskResultPayload,
   KioskResultPayloadSchema,
+  type EnrollmentRequest,
+  type EnrollmentStatusResponse,
+  EnrollmentStatusResponseSchema,
+  type EnrollmentProfile,
+  EnrollmentProfileSchema,
   type AuditLogResponse,
   AuditLogResponseSchema,
   AuthSessionSchema,
@@ -784,6 +789,27 @@ export const apiClient = {
     const match = /filename="?([^"]+)"?/.exec(disposition);
     const filename = match?.[1] ?? `participant-${userId}.pdf`;
     return { bytes: await response.arrayBuffer(), filename };
+  },
+
+  // ---- Enrollment (front-of-platform participant intake) ------------------
+
+  async getEnrollmentStatus(
+    accessToken: string,
+  ): Promise<EnrollmentStatusResponse> {
+    const raw = await request<unknown>('/enrollment/status', { accessToken });
+    return EnrollmentStatusResponseSchema.parse(raw);
+  },
+
+  async enroll(
+    accessToken: string,
+    payload: EnrollmentRequest,
+  ): Promise<EnrollmentProfile> {
+    const raw = await request<unknown>('/enrollment', {
+      method: 'POST',
+      accessToken,
+      body: payload,
+    });
+    return EnrollmentProfileSchema.parse(raw);
   },
 };
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import ORJSONResponse
 from sqlalchemy.exc import IntegrityError
@@ -105,7 +106,10 @@ def register_exception_handlers(app: FastAPI) -> None:
             "validation_error",
             "Request payload failed validation.",
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            details={"errors": exc.errors()},
+            # jsonable_encoder stringifies non-serialisable ctx values (e.g. a
+            # ValueError raised in a pydantic model_validator) so orjson can
+            # encode the body — otherwise the handler itself 500s.
+            details={"errors": jsonable_encoder(exc.errors())},
         )
 
     @app.exception_handler(IntegrityError)
