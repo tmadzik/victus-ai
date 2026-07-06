@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from victus_api.db.models import (
     ReferralDestinationType,
+    ReferralOutcome,
     ReferralStatus,
     ReferralUrgency,
 )
@@ -30,6 +31,13 @@ class UpdateReferralStatusRequest(BaseModel):
     notes: Annotated[str, Field(max_length=1000)] | None = None
 
 
+class RecordReferralOutcomeRequest(BaseModel):
+    """Close the care loop: the facility-confirmed clinical result."""
+
+    outcome: ReferralOutcome
+    notes: Annotated[str, Field(max_length=1000)] | None = None
+
+
 class ReferralResponse(BaseModel):
     id: uuid.UUID
     participant_user_id: uuid.UUID
@@ -41,5 +49,8 @@ class ReferralResponse(BaseModel):
     urgency: str
     status: str
     notes: str | None
+    outcome: str
+    outcome_recorded_at: datetime | None
+    outcome_notes: str | None
     created_at: datetime
     updated_at: datetime

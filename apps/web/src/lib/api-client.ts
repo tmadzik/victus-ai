@@ -50,6 +50,7 @@ import {
   type ParticipantSummary,
   ParticipantSummarySchema,
   type CreateReferral,
+  type RecordReferralOutcome,
   type ReferralResponse,
   ReferralResponseSchema,
   type UpdateReferralStatus,
@@ -681,6 +682,19 @@ export const apiClient = {
     payload: UpdateReferralStatus,
   ): Promise<ReferralResponse> {
     const raw = await request<unknown>(`/referrals/${referralId}/status`, {
+      method: 'PATCH',
+      accessToken,
+      body: payload,
+    });
+    return ReferralResponseSchema.parse(raw);
+  },
+
+  async recordReferralOutcome(
+    accessToken: string,
+    referralId: string,
+    payload: RecordReferralOutcome,
+  ): Promise<ReferralResponse> {
+    const raw = await request<unknown>(`/referrals/${referralId}/outcome`, {
       method: 'PATCH',
       accessToken,
       body: payload,

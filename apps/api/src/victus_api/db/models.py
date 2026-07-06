@@ -75,6 +75,7 @@ class AuditAction(str, enum.Enum):
     # Care-navigation referrals.
     REFERRAL_CREATED = "REFERRAL_CREATED"
     REFERRAL_STATUS_UPDATED = "REFERRAL_STATUS_UPDATED"
+    REFERRAL_OUTCOME_RECORDED = "REFERRAL_OUTCOME_RECORDED"
 
 
 class ErasureJurisdiction(str, enum.Enum):
@@ -1193,6 +1194,21 @@ class ReferralStatus(str, enum.Enum):
     CANCELLED = "CANCELLED"
 
 
+class ReferralOutcome(str, enum.Enum):
+    """What happened at the facility — closes the care loop. Distinct from
+    ``status`` (which tracks the referral's administrative lifecycle); this
+    records the *clinical result* of the onward care, which is also the
+    ground-truth signal the model ultimately needs."""
+
+    PENDING = "PENDING"  # no facility outcome recorded yet
+    ATTENDED_CONFIRMED = "ATTENDED_CONFIRMED"  # seen; flagged condition confirmed
+    ATTENDED_NOT_CONFIRMED = "ATTENDED_NOT_CONFIRMED"  # seen; not confirmed
+    ATTENDED_INCONCLUSIVE = "ATTENDED_INCONCLUSIVE"  # seen; inconclusive
+    TREATMENT_STARTED = "TREATMENT_STARTED"  # seen, confirmed, treatment begun
+    DID_NOT_ATTEND = "DID_NOT_ATTEND"  # lost to follow-up
+    DECLINED_CARE = "DECLINED_CARE"  # declined onward care
+
+
 class ReferralDestinationType(str, enum.Enum):
     VICTUS_FACILITY = "VICTUS_FACILITY"
     PRIMARY_HEALTH_CENTRE = "PRIMARY_HEALTH_CENTRE"  # public PHC (e.g. Nigeria)
@@ -1247,6 +1263,18 @@ class Referral(Base):
         server_default=ReferralStatus.PENDING.value,
     )
     notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+
+    # Care-loop closure: the facility-confirmed clinical outcome of the onward
+    # care. Defaults to PENDING until a clinician records what happened.
+    outcome: Mapped[ReferralOutcome] = mapped_column(
+        SAEnum(ReferralOutcome, name="referral_outcome", native_enum=True),
+        nullable=False,
+        server_default=ReferralOutcome.PENDING.value,
+    )
+    outcome_recorded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    outcome_notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), index=True

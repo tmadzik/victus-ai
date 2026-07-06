@@ -111,3 +111,55 @@ def test_status_update_unknown_referral_is_404(client: Any) -> None:
         json={"status": "COMPLETED"},
     )
     assert r.status_code == 404, r.text
+
+
+def test_record_outcome_closes_the_care_loop(client: Any) -> None:
+    participant = register(client, "PATIENT")
+    clinician = _clinician(client)
+    created = client.post(
+        "/referrals",
+        headers=clinician["headers"],
+        json=_referral_payload(participant["id"]),
+    )
+    assert created.status_code == 201, created.text
+    ref = created.json()
+    # A fresh referral starts with no facility outcome.
+    assert ref["outcome"] == "PENDING"
+    assert ref["outcome_recorded_at"] is None
+
+    upd = client.patch(
+        f"/referrals/{ref['id']}/outcome",
+        headers=clinician["headers"],
+        json={"outcome": "ATTENDED_CONFIRMED", "notes": "HbA1c 7.4% — confirmed."},
+    )
+    assert upd.status_code == 200, upd.text
+    body = upd.json()
+    assert body["outcome"] == "ATTENDED_CONFIRMED"
+    assert body["outcome_recorded_at"] is not None
+    assert body["outcome_notes"] == "HbA1c 7.4% — confirmed."
+
+
+def test_patient_cannot_record_outcome(client: Any) -> None:
+    participant = register(client, "PATIENT")
+    clinician = _clinician(client)
+    ref = client.post(
+        "/referrals",
+        headers=clinician["headers"],
+        json=_referral_payload(participant["id"]),
+    ).json()
+    r = client.patch(
+        f"/referrals/{ref['id']}/outcome",
+        headers=participant["headers"],
+        json={"outcome": "ATTENDED_CONFIRMED"},
+    )
+    assert r.status_code == 403, r.text
+
+
+def test_outcome_unknown_referral_is_404(client: Any) -> None:
+    clinician = _clinician(client)
+    r = client.patch(
+        f"/referrals/{uuid.uuid4()}/outcome",
+        headers=clinician["headers"],
+        json={"outcome": "DID_NOT_ATTEND"},
+    )
+    assert r.status_code == 404, r.text
