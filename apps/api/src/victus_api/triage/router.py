@@ -1,7 +1,7 @@
 """Pathway A HTTP layer — assessment + history."""
-
 from __future__ import annotations
 
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request, status
@@ -10,10 +10,15 @@ from victus_api.config import Settings, get_settings
 from victus_api.core.deps import CurrentUser, DbSession, require_consent, require_role
 from victus_api.db.models import ConsentType, UserRole
 from victus_api.triage.schemas import (
+    TrajectoryResponse,
     TriageAssessmentRequest,
     TriageAssessmentResponse,
 )
-from victus_api.triage.service import assess_triage, list_assessments_for_user
+from victus_api.triage.service import (
+    assess_triage,
+    list_assessments_for_user,
+    trajectory_for_user,
+)
 
 router = APIRouter(prefix="/pathways/triage", tags=["pathway-a-triage"])
 
@@ -72,4 +77,43 @@ async def list_my_assessments(
 ) -> list[TriageAssessmentResponse]:
     return await list_assessments_for_user(
         db, user_id=user.id, settings=settings, limit=limit
+    )
+
+
+@router.get(
+    "/trajectory/me",
+    response_model=TrajectoryResponse,
+    summary="The authenticated user's longitudinal per-disease risk trajectory.",
+)
+async def my_trajectory(
+    db: DbSession,
+    user: Annotated[
+        CurrentUser,
+        Depends(require_role(UserRole.PATIENT, UserRole.CHW, UserRole.CLINICIAN)),
+    ],
+    _consent: Annotated[CurrentUser, Depends(require_consent(ConsentType.TRIAGE))],
+    settings: Annotated[Settings, Depends(get_settings)],
+    limit: Annotated[int, Query(ge=2, le=100)] = 50,
+) -> TrajectoryResponse:
+    return await trajectory_for_user(
+        db, user_id=user.id, settings=settings, limit=limit
+    )
+
+
+@router.get(
+    "/trajectory/participant/{user_id}",
+    response_model=TrajectoryResponse,
+    summary="A participant's risk trajectory (clinician/admin).",
+)
+async def participant_trajectory(
+    db: DbSession,
+    _user: Annotated[
+        CurrentUser, Depends(require_role(UserRole.CLINICIAN, UserRole.ADMIN))
+    ],
+    user_id: uuid.UUID,
+    settings: Annotated[Settings, Depends(get_settings)],
+    limit: Annotated[int, Query(ge=2, le=100)] = 50,
+) -> TrajectoryResponse:
+    return await trajectory_for_user(
+        db, user_id=user_id, settings=settings, limit=limit
     )

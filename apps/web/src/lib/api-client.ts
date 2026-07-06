@@ -71,6 +71,8 @@ import {
   type ToiAssessmentRequest,
   type ToiAssessmentResponse,
   ToiAssessmentResponseSchema,
+  type TrajectoryResponse,
+  TrajectoryResponseSchema,
   type TriageAssessmentRequest,
   type TriageAssessmentResponse,
   TriageAssessmentResponseSchema,
@@ -240,6 +242,17 @@ export const apiClient = {
       throw new ApiError(502, 'invalid_response', 'Expected array of assessments.');
     }
     return raw.map((item) => TriageAssessmentResponseSchema.parse(item));
+  },
+
+  async getMyTrajectory(
+    accessToken: string,
+    limit = 50,
+  ): Promise<TrajectoryResponse> {
+    const raw = await request<unknown>(
+      `/pathways/triage/trajectory/me?limit=${limit}`,
+      { accessToken },
+    );
+    return TrajectoryResponseSchema.parse(raw);
   },
 
   async assessToi(
