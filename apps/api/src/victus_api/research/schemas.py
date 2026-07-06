@@ -10,7 +10,8 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from victus_api.db.models import RiskClass
-from victus_api.triage.schemas import Sex
+from victus_api.triage.acquisition import AcquisitionPriority
+from victus_api.triage.schemas import Disease, Sex
 
 
 class CaptureDomain(str, enum.Enum):
@@ -117,3 +118,23 @@ class ResearchCorpusStats(BaseModel):
     label_distribution: LabelDistribution
     with_bp: int
     with_diabetes_marker: int
+
+
+class AcquisitionWorklistItem(BaseModel):
+    """One participant on the confirmatory-testing worklist, ranked by how much
+    acquiring their ground truth would improve the model (uncertainty × decision
+    boundary from the EDL output). One row per participant (latest assessment)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    assessment_id: uuid.UUID
+    user_id: uuid.UUID
+    site_code: str
+    driving_disease: Disease
+    confirmatory_test: str
+    acquisition_score: float
+    epistemic_component: float
+    boundary_component: float
+    priority: AcquisitionPriority
+    rationale: str
+    created_at: datetime
