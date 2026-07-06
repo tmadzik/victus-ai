@@ -18,17 +18,20 @@ from victus_api.core.deps import DbSession, require_role
 from victus_api.db.models import User, UserRole
 from victus_api.research.importer import import_rows, parse_csv
 from victus_api.research.schemas import (
+    AcquisitionWorklistItem,
     ResearchCaseCreate,
     ResearchCaseResponse,
     ResearchCorpusStats,
     ResearchImportSummary,
 )
 from victus_api.research.service import (
+    acquisition_worklist,
     corpus_stats,
     create_research_case,
     export_training_rows,
     list_research_cases,
 )
+from victus_api.triage.acquisition import AcquisitionPriority
 
 router = APIRouter(prefix="/research", tags=["research"])
 
@@ -81,6 +84,24 @@ async def list_cases(
 )
 async def stats(_user: Researcher, db: DbSession) -> ResearchCorpusStats:
     return await corpus_stats(db)
+
+
+@router.get(
+    "/acquisition-worklist",
+    response_model=list[AcquisitionWorklistItem],
+    summary=(
+        "Active-learning worklist: participants ranked by how much confirmatory "
+        "ground truth would improve the model (EDL uncertainty × decision "
+        "boundary). Spend scarce lab tests where they are most informative."
+    ),
+)
+async def acquisition(
+    _user: Researcher,
+    db: DbSession,
+    min_priority: AcquisitionPriority = AcquisitionPriority.LOW,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list[AcquisitionWorklistItem]:
+    return await acquisition_worklist(db, limit=limit, min_priority=min_priority)
 
 
 @router.get(

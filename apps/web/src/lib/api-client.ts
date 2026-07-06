@@ -55,6 +55,8 @@ import {
   type UpdateReferralStatus,
   type RecordCalibrationRequest,
   type RegisterRequest,
+  type AcquisitionWorklistItem,
+  AcquisitionWorklistItemSchema,
   type ResearchCaseCreate,
   type ResearchCaseResponse,
   ResearchCaseResponseSchema,
@@ -398,6 +400,20 @@ export const apiClient = {
       accessToken,
     });
     return ResearchCorpusStatsSchema.parse(raw);
+  },
+
+  async getAcquisitionWorklist(
+    accessToken: string,
+    limit = 25,
+  ): Promise<AcquisitionWorklistItem[]> {
+    const raw = await request<unknown>(
+      `/research/acquisition-worklist?limit=${limit}`,
+      { accessToken },
+    );
+    if (!Array.isArray(raw)) {
+      throw new ApiError(502, 'invalid_response', 'Expected array of items.');
+    }
+    return raw.map((item) => AcquisitionWorklistItemSchema.parse(item));
   },
 
   // ---- Data governance ----------------------------------------------------

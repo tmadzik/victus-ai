@@ -14,6 +14,7 @@ A clinician may override any derived label; the basis string records which.
 
 from __future__ import annotations
 
+import uuid
 from collections import Counter
 
 from sqlalchemy import desc, select
@@ -21,13 +22,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from victus_api.core.exceptions import VictusError
 from victus_api.core.logging import get_logger
-from victus_api.db.models import ResearchTriageCase, RiskClass, User
+from victus_api.db.models import (
+    ResearchTriageCase,
+    RiskClass,
+    TriageAssessment,
+    User,
+)
 from victus_api.research.schemas import (
+    AcquisitionWorklistItem,
     LabelDistribution,
     ResearchCaseCreate,
     ResearchCaseResponse,
     ResearchCorpusStats,
 )
+from victus_api.triage.acquisition import AcquisitionPriority, score_assessment
+from victus_api.triage.schemas import PerDiseaseRisk
 
 log = get_logger(__name__)
 
@@ -236,6 +245,70 @@ async def list_research_cases(
         )
     ).all()
     return [_to_response(r) for r in rows]
+
+
+_PRIORITY_RANK = {
+    AcquisitionPriority.LOW: 0,
+    AcquisitionPriority.MEDIUM: 1,
+    AcquisitionPriority.HIGH: 2,
+}
+
+
+async def acquisition_worklist(
+    db: AsyncSession,
+    *,
+    limit: int = 50,
+    min_priority: AcquisitionPriority = AcquisitionPriority.LOW,
+    scan: int = 500,
+) -> list[AcquisitionWorklistItem]:
+    """Rank participants by how much acquiring confirmatory ground truth would
+    improve the model (active learning over the EDL uncertainty).
+
+    Scans the most recent ``scan`` assessments, keeps one row per participant
+    (their latest), scores each, drops those below ``min_priority``, and returns
+    the top ``limit`` by acquisition value. Erased participants are excluded —
+    they cannot be followed up.
+    """
+    stmt = (
+        select(TriageAssessment, User.site_code)
+        .join(User, User.id == TriageAssessment.user_id)
+        .where(User.erased_at.is_(None))
+        .order_by(desc(TriageAssessment.created_at))
+        .limit(scan)
+    )
+    rows = (await db.execute(stmt)).all()
+
+    seen: set[uuid.UUID] = set()
+    items: list[AcquisitionWorklistItem] = []
+    for assessment, site_code in rows:
+        if assessment.user_id in seen:
+            continue  # keep only the participant's most recent assessment
+        seen.add(assessment.user_id)
+        per_disease = [
+            PerDiseaseRisk.model_validate(entry)
+            for entry in (assessment.per_disease_risks or [])
+        ]
+        score = score_assessment(per_disease)
+        if score is None or _PRIORITY_RANK[score.priority] < _PRIORITY_RANK[min_priority]:
+            continue
+        items.append(
+            AcquisitionWorklistItem(
+                assessment_id=assessment.id,
+                user_id=assessment.user_id,
+                site_code=site_code,
+                driving_disease=score.driving_disease,
+                confirmatory_test=score.confirmatory_test,
+                acquisition_score=score.acquisition_score,
+                epistemic_component=score.epistemic_component,
+                boundary_component=score.boundary_component,
+                priority=score.priority,
+                rationale=score.rationale,
+                created_at=assessment.created_at,
+            )
+        )
+
+    items.sort(key=lambda i: i.acquisition_score, reverse=True)
+    return items[:limit]
 
 
 async def export_training_rows(db: AsyncSession) -> list[dict[str, object]]:

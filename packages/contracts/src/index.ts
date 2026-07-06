@@ -1061,6 +1061,38 @@ export const ResearchCorpusStatsSchema = z.object({
 });
 export type ResearchCorpusStats = z.infer<typeof ResearchCorpusStatsSchema>;
 
+/**
+ * Active-learning ground-truth acquisition. Participants are ranked by how much
+ * a confirmatory lab test would improve the model — high EDL uncertainty near a
+ * decision boundary — so scarce confirmatory testing is spent where it is most
+ * informative for validation/calibration.
+ */
+export const AcquisitionPriority = {
+  HIGH: 'HIGH',
+  MEDIUM: 'MEDIUM',
+  LOW: 'LOW',
+} as const;
+export type AcquisitionPriority =
+  (typeof AcquisitionPriority)[keyof typeof AcquisitionPriority];
+export const AcquisitionPrioritySchema = z.nativeEnum(AcquisitionPriority);
+
+export const AcquisitionWorklistItemSchema = z.object({
+  assessment_id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  site_code: z.string(),
+  driving_disease: DiseaseSchema,
+  confirmatory_test: z.string(),
+  acquisition_score: z.number(),
+  epistemic_component: z.number(),
+  boundary_component: z.number(),
+  priority: AcquisitionPrioritySchema,
+  rationale: z.string(),
+  created_at: z.string(),
+});
+export type AcquisitionWorklistItem = z.infer<
+  typeof AcquisitionWorklistItemSchema
+>;
+
 // ===========================================================================
 // CLINICIAN PARTICIPANT REVIEW
 // ===========================================================================

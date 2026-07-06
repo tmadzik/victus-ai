@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import {
+  type AcquisitionWorklistItem,
   DISEASES,
   DISEASE_LABELS,
   type ResearchCaseResponse,
@@ -45,9 +46,10 @@ export default async function ResearchPage(): Promise<React.ReactElement> {
   if (!session?.user) redirect('/login');
   if (!RESEARCHER_ROLES.includes(session.user.role)) redirect('/dashboard');
 
-  const [stats, cases] = await Promise.all([
+  const [stats, cases, worklist] = await Promise.all([
     apiClient.getResearchStats(session.accessToken),
     apiClient.listResearchCases(session.accessToken, 25),
+    apiClient.getAcquisitionWorklist(session.accessToken, 25),
   ]);
 
   return (
@@ -75,10 +77,97 @@ export default async function ResearchPage(): Promise<React.ReactElement> {
 
       <Dashboard stats={stats} />
 
+      <AcquisitionWorklist items={worklist} />
+
       <ResearchCaptureForm />
 
       <RecentCases cases={cases} />
     </div>
+  );
+}
+
+const PRIORITY_BADGE: Record<AcquisitionWorklistItem['priority'], string> = {
+  HIGH: 'bg-rose-100 text-rose-800 ring-rose-300',
+  MEDIUM: 'bg-amber-100 text-amber-800 ring-amber-300',
+  LOW: 'bg-brand-100 text-brand-700 ring-brand-300',
+};
+
+function AcquisitionWorklist({
+  items,
+}: {
+  items: AcquisitionWorklistItem[];
+}): React.ReactElement {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">
+          Confirmatory-testing worklist{' '}
+          <span className="text-sm font-normal text-brand-600">
+            (active learning)
+          </span>
+        </CardTitle>
+        <p className="mt-1 max-w-3xl text-sm text-brand-700">
+          Participants ranked by how much a confirmatory lab test would improve
+          the model — highest where it is both uncertain and near a decision
+          boundary. Spend scarce HbA1c / fasting-glucose tests here first to make
+          prospective validation several-fold more sample-efficient.
+        </p>
+      </CardHeader>
+      <CardContent>
+        {items.length === 0 ? (
+          <p className="py-6 text-center text-sm text-brand-600">
+            No assessments to prioritise yet.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-brand-100 text-xs uppercase tracking-wider text-brand-600">
+                <tr>
+                  <th className="px-3 py-2">Priority</th>
+                  <th className="px-3 py-2">Score</th>
+                  <th className="px-3 py-2">Target</th>
+                  <th className="px-3 py-2">Confirmatory test</th>
+                  <th className="px-3 py-2">Site</th>
+                  <th className="px-3 py-2">Why</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((it) => (
+                  <tr
+                    key={it.assessment_id}
+                    className="border-b border-brand-50 last:border-0 align-top"
+                  >
+                    <td className="px-3 py-2">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${PRIORITY_BADGE[it.priority]}`}
+                      >
+                        {it.priority}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 font-mono text-brand-900">
+                      {it.acquisition_score.toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 text-brand-800">
+                      {DISEASE_LABELS[it.driving_disease]}
+                    </td>
+                    <td className="px-3 py-2 text-brand-700">
+                      {it.confirmatory_test}
+                    </td>
+                    <td className="px-3 py-2 font-mono text-brand-700">
+                      {it.site_code}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-brand-600">
+                      u {it.epistemic_component.toFixed(2)} · boundary{' '}
+                      {it.boundary_component.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
