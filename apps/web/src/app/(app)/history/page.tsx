@@ -1,8 +1,15 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
+import {
+  type DiseaseTrajectory,
+  DISEASE_LABELS,
+  type TrajectoryResponse,
+} from '@victus/contracts';
+
 import { AssessmentTimeline, fmtDate } from '@/components/assessment-timeline';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatLocale } from '@/i18n/config';
 import { getLocale } from '@/i18n';
 import { ApiError, apiClient } from '@/lib/api-client';
@@ -21,13 +28,23 @@ async function safeList<T>(p: Promise<T[]>): Promise<T[]> {
   }
 }
 
+async function safeOne<T>(p: Promise<T>): Promise<T | null> {
+  try {
+    return await p;
+  } catch (err) {
+    if (err instanceof ApiError && (err.status === 403 || err.status === 404)) return null;
+    throw err;
+  }
+}
+
 export default async function HistoryPage(): Promise<React.ReactElement> {
   const session = await auth();
   if (!session?.user) redirect('/login?reason=session_expired');
 
-  const [triage, toi] = await Promise.all([
+  const [triage, toi, trajectory] = await Promise.all([
     safeList(apiClient.listMyTriageAssessments(session.accessToken, 50)),
     safeList(apiClient.listMyToiAssessments(session.accessToken, 50)),
+    safeOne(apiClient.getMyTrajectory(session.accessToken, 50)),
   ]);
 
   const formatLoc = formatLocale(await getLocale());
@@ -68,6 +85,8 @@ export default async function HistoryPage(): Promise<React.ReactElement> {
         <Metric label="Last activity" value={lastActivity} mono={false} />
       </section>
 
+      <TrajectoryPanel trajectory={trajectory} />
+
       <AssessmentTimeline
         triage={triage}
         toi={toi}
@@ -87,6 +106,104 @@ export default async function HistoryPage(): Promise<React.ReactElement> {
         }
       />
     </div>
+  );
+}
+
+const DIRECTION_META: Record<
+  DiseaseTrajectory['direction'],
+  { arrow: string; label: string; className: string }
+> = {
+  // Rising risk is bad (rose); falling risk is good (emerald); stable neutral.
+  RISING: { arrow: '↑', label: 'Rising', className: 'text-rose-700' },
+  FALLING: { arrow: '↓', label: 'Falling', className: 'text-emerald-700' },
+  STABLE: { arrow: '→', label: 'Stable', className: 'text-brand-600' },
+};
+
+function Sparkline({ values }: { values: number[] }): React.ReactElement {
+  const w = 120;
+  const h = 32;
+  const n = values.length;
+  const first = values[0] ?? 0;
+  const pts =
+    n === 1
+      ? `0,${h - first * h} ${w},${h - first * h}`
+      : values
+          .map((v, i) => `${(i / (n - 1)) * w},${(h - v * h).toFixed(1)}`)
+          .join(' ');
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="overflow-visible">
+      <polyline
+        points={pts}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function TrajectoryPanel({
+  trajectory,
+}: {
+  trajectory: TrajectoryResponse | null;
+}): React.ReactElement | null {
+  const trends = (trajectory?.trajectories ?? []).filter((t) => t.points.length >= 2);
+  if (trends.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">
+          Risk trajectory{' '}
+          <span className="text-sm font-normal text-brand-600">
+            over your repeated checks
+          </span>
+        </CardTitle>
+        <p className="mt-1 max-w-3xl text-sm text-brand-700">
+          How each disease&apos;s risk is moving over time. A change is only
+          flagged as <em>real</em> when it exceeds the model&apos;s own
+          measurement uncertainty — otherwise it&apos;s treated as run-to-run
+          noise, not a trend.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {trends.map((t) => {
+            const dir = DIRECTION_META[t.direction];
+            return (
+              <div
+                key={t.disease}
+                className="rounded-[var(--radius-control)] border border-brand-100 p-3"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-brand-900">
+                    {DISEASE_LABELS[t.disease]}
+                  </span>
+                  <span className={`text-sm font-semibold ${dir.className}`}>
+                    {dir.arrow} {dir.label}
+                  </span>
+                </div>
+                <div className={`mt-2 ${dir.className}`}>
+                  <Sparkline values={t.points.map((p) => p.risk_index)} />
+                </div>
+                <p className="mt-2 text-xs text-brand-600">
+                  {t.change_is_significant
+                    ? `Significant change (Δ ${t.delta >= 0 ? '+' : ''}${t.delta.toFixed(2)})`
+                    : 'Within measurement noise'}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+        {trajectory && !trajectory.clinical_claims_authorised ? (
+          <p className="mt-4 text-xs text-brand-500">
+            Research demonstrator — an unvalidated model output, not a clinical
+            trend.
+          </p>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 

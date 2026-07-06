@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import desc, select
@@ -55,9 +56,12 @@ from victus_api.triage.schemas import (
     RISK_CLASSES,
     SAFETY_OVERRIDE_DISEASE,
     Disease,
+    DiseaseTrajectoryResponse,
     PerDiseaseRisk,
     PlausibilityFlag,
     RiskClass,
+    TrajectoryPointResponse,
+    TrajectoryResponse,
     TriageAssessmentRequest,
     TriageAssessmentResponse,
     TriageState,
@@ -65,6 +69,11 @@ from victus_api.triage.schemas import (
 )
 from victus_api.triage.schemas import (
     DerivedFeatures as DerivedSchema,
+)
+from victus_api.triage.trajectory import (
+    AssessmentSnapshot,
+    DiseaseTrajectory,
+    build_trajectories,
 )
 from victus_api.triage.validation import detect_plausibility_flags
 
@@ -374,6 +383,64 @@ async def list_assessments_for_user(
     rows = (await db.scalars(stmt)).all()
     mode = resolve_claims_mode(settings)
     return [_row_to_response(row, mode=mode) for row in rows]
+
+
+def _trajectory_to_response(traj: DiseaseTrajectory) -> DiseaseTrajectoryResponse:
+    return DiseaseTrajectoryResponse(
+        disease=traj.disease,
+        latest_state=traj.latest_state,
+        baseline_index=traj.baseline_index,
+        latest_index=traj.latest_index,
+        delta=traj.delta,
+        direction=traj.direction,
+        change_is_significant=traj.change_is_significant,
+        points=[
+            TrajectoryPointResponse(
+                at=p.at, risk_index=p.risk_index, vacuity=p.vacuity, state=p.state
+            )
+            for p in traj.points
+        ],
+    )
+
+
+async def trajectory_for_user(
+    db: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    settings: Settings,
+    limit: int = 50,
+) -> TrajectoryResponse:
+    """Per-disease longitudinal trajectory from a participant's assessments.
+
+    Screening → prevention: shows whether each disease's risk is moving, and
+    calls a change *significant* only when it exceeds the model's own measurement
+    uncertainty (so noise is not mistaken for progression)."""
+    stmt = (
+        select(TriageAssessmentRow)
+        .where(TriageAssessmentRow.user_id == user_id)
+        .order_by(desc(TriageAssessmentRow.created_at))
+        .limit(limit)
+    )
+    rows = list((await db.scalars(stmt)).all())
+    rows.reverse()  # ascending by time for the trajectory
+    snapshots = [
+        AssessmentSnapshot(
+            at=row.created_at,
+            per_disease=[
+                PerDiseaseRisk.model_validate(entry)
+                for entry in (row.per_disease_risks or [])
+            ],
+        )
+        for row in rows
+    ]
+    mode = resolve_claims_mode(settings)
+    return TrajectoryResponse(
+        user_id=user_id,
+        generated_at=datetime.now(UTC),
+        trajectories=[_trajectory_to_response(t) for t in build_trajectories(snapshots)],
+        claims_mode=mode,
+        clinical_claims_authorised=mode is ClaimsMode.CLINICAL,
+    )
 
 
 # --- Helpers -----------------------------------------------------------------

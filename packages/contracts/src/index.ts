@@ -347,6 +347,47 @@ export const TriageAssessmentResponseSchema = z.object({
 });
 export type TriageAssessmentResponse = z.infer<typeof TriageAssessmentResponseSchema>;
 
+// ---- Longitudinal trajectory ----------------------------------------------
+
+/** Direction of a disease's risk over time. */
+export const TrajectoryDirection = {
+  RISING: 'RISING',
+  STABLE: 'STABLE',
+  FALLING: 'FALLING',
+} as const;
+export type TrajectoryDirection =
+  (typeof TrajectoryDirection)[keyof typeof TrajectoryDirection];
+
+export const TrajectoryPointSchema = z.object({
+  at: z.string(),
+  risk_index: z.number(),
+  vacuity: z.number(),
+  state: z.nativeEnum(TriageState),
+});
+export type TrajectoryPoint = z.infer<typeof TrajectoryPointSchema>;
+
+export const DiseaseTrajectorySchema = z.object({
+  disease: DiseaseSchema,
+  latest_state: z.nativeEnum(TriageState),
+  baseline_index: z.number(),
+  latest_index: z.number(),
+  delta: z.number(),
+  direction: z.nativeEnum(TrajectoryDirection),
+  /** True only when the change beats the model's own measurement uncertainty. */
+  change_is_significant: z.boolean(),
+  points: z.array(TrajectoryPointSchema),
+});
+export type DiseaseTrajectory = z.infer<typeof DiseaseTrajectorySchema>;
+
+export const TrajectoryResponseSchema = z.object({
+  user_id: z.string().uuid(),
+  generated_at: z.string(),
+  trajectories: z.array(DiseaseTrajectorySchema),
+  claims_mode: ClaimsModeSchema,
+  clinical_claims_authorised: z.boolean(),
+});
+export type TrajectoryResponse = z.infer<typeof TrajectoryResponseSchema>;
+
 /**
  * Client-side defence in depth: the wizard checks this before submitting so
  * the user sees the RED state instantly. The API re-checks server-side and is

@@ -199,3 +199,49 @@ class TriageAssessmentResponse(BaseModel):
     clinical_claims_authorised: bool
     disclaimer: str
     created_at: datetime
+
+
+# --- Longitudinal trajectories -----------------------------------------------
+
+
+class TrajectoryDirection(str, enum.Enum):
+    RISING = "RISING"
+    STABLE = "STABLE"
+    FALLING = "FALLING"
+
+
+class TrajectoryPointResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    at: datetime
+    risk_index: Annotated[float, Field(ge=0.0, le=1.0)]
+    vacuity: Annotated[float, Field(ge=0.0, le=1.0)]
+    state: TriageState
+
+
+class DiseaseTrajectoryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    disease: Disease
+    latest_state: TriageState
+    baseline_index: float
+    latest_index: float
+    delta: float
+    direction: TrajectoryDirection
+    # True only when the change exceeds the combined measurement uncertainty of
+    # its endpoints — i.e. a real move, not run-to-run noise.
+    change_is_significant: bool
+    points: list[TrajectoryPointResponse]
+
+
+class TrajectoryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: uuid.UUID
+    generated_at: datetime
+    trajectories: list[DiseaseTrajectoryResponse]
+    # Same gate as the point-in-time assessment: this is a derived analytic of an
+    # unvalidated model and must not be presented as an actionable clinical trend
+    # until the gate is open.
+    claims_mode: ClaimsMode
+    clinical_claims_authorised: bool
