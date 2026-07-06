@@ -16,6 +16,7 @@ from victus_api.core.deps import CurrentUser, DbSession, require_role
 from victus_api.db.models import UserRole
 from victus_api.referrals.schemas import (
     CreateReferralRequest,
+    RecordReferralOutcomeRequest,
     ReferralResponse,
     UpdateReferralStatusRequest,
 )
@@ -23,6 +24,7 @@ from victus_api.referrals.service import (
     create_referral,
     list_my_referrals,
     list_referrals_for_participant,
+    record_referral_outcome,
     update_referral_status,
 )
 
@@ -100,6 +102,29 @@ async def update_status_endpoint(
 ) -> ReferralResponse:
     ip, ua = _client_metadata(request)
     return await update_referral_status(
+        db,
+        actor=user,
+        referral_id=referral_id,
+        payload=payload,
+        ip_address=ip,
+        user_agent=ua,
+    )
+
+
+@router.patch(
+    "/{referral_id}/outcome",
+    response_model=ReferralResponse,
+    summary="Record a referral's facility outcome — closes the care loop.",
+)
+async def record_outcome_endpoint(
+    db: DbSession,
+    user: ReferrerUser,
+    request: Request,
+    referral_id: uuid.UUID,
+    payload: RecordReferralOutcomeRequest,
+) -> ReferralResponse:
+    ip, ua = _client_metadata(request)
+    return await record_referral_outcome(
         db,
         actor=user,
         referral_id=referral_id,

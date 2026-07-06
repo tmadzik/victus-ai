@@ -7,7 +7,9 @@ import {
   type Disease,
   DISEASE_LABELS,
   REFERRAL_DESTINATION_LABELS,
+  REFERRAL_OUTCOME_LABELS,
   type ReferralDestinationType,
+  type ReferralOutcome,
   referralDestinationsForSite,
   type ReferralResponse,
   type ReferralStatus,
@@ -21,8 +23,27 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useFormatLocale } from '@/i18n/context';
 import {
   createReferralAction,
+  recordReferralOutcomeAction,
   updateReferralStatusAction,
 } from '@/server/referral-actions';
+
+// The outcomes a clinician can record (PENDING is the un-recorded default).
+const OUTCOME_OPTIONS: ReferralOutcome[] = [
+  'ATTENDED_CONFIRMED',
+  'ATTENDED_NOT_CONFIRMED',
+  'ATTENDED_INCONCLUSIVE',
+  'TREATMENT_STARTED',
+  'DID_NOT_ATTEND',
+  'DECLINED_CARE',
+];
+const OUTCOME_TONE: Record<string, BadgeProps['tone']> = {
+  ATTENDED_CONFIRMED: 'green',
+  TREATMENT_STARTED: 'green',
+  ATTENDED_NOT_CONFIRMED: 'neutral',
+  ATTENDED_INCONCLUSIVE: 'yellow',
+  DID_NOT_ATTEND: 'red',
+  DECLINED_CARE: 'red',
+};
 
 const URGENCIES: ReferralUrgency[] = ['ROUTINE', 'URGENT', 'EMERGENCY'];
 
@@ -127,6 +148,22 @@ export function ReferralsPanel({
     setError(null);
     startTransition(async () => {
       const res = await updateReferralStatusAction(referralId, participantId, status);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  function changeOutcome(referralId: string, outcome: ReferralOutcome): void {
+    setError(null);
+    startTransition(async () => {
+      const res = await recordReferralOutcomeAction(
+        referralId,
+        participantId,
+        outcome,
+      );
       if (!res.ok) {
         setError(res.error);
         return;
@@ -294,6 +331,38 @@ export function ReferralsPanel({
                     ))}
                   </div>
                 ) : null}
+
+                {/* Care-loop closure: the facility outcome. */}
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-brand-100 pt-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">
+                    Facility outcome
+                  </span>
+                  {r.outcome === 'PENDING' ? (
+                    <span className="text-xs text-brand-500">not yet recorded</span>
+                  ) : (
+                    <Badge tone={OUTCOME_TONE[r.outcome] ?? 'neutral'}>
+                      {REFERRAL_OUTCOME_LABELS[r.outcome as ReferralOutcome] ??
+                        r.outcome}
+                    </Badge>
+                  )}
+                  <select
+                    aria-label="Record facility outcome"
+                    className="ml-auto rounded-[var(--radius-control)] border border-brand-200 bg-white px-2 py-1 text-xs text-brand-900 outline-none focus:border-brand-500"
+                    value=""
+                    disabled={pending}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v) changeOutcome(r.id, v as ReferralOutcome);
+                    }}
+                  >
+                    <option value="">Record outcome…</option>
+                    {OUTCOME_OPTIONS.map((o) => (
+                      <option key={o} value={o}>
+                        {REFERRAL_OUTCOME_LABELS[o]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </li>
             ))}
           </ul>

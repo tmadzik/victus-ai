@@ -6,6 +6,8 @@ import { redirect } from 'next/navigation';
 import {
   type CreateReferral,
   CreateReferralSchema,
+  type ReferralOutcome,
+  RecordReferralOutcomeSchema,
   type ReferralStatus,
   UpdateReferralStatusSchema,
 } from '@victus/contracts';
@@ -61,6 +63,31 @@ export async function updateReferralStatusAction(
     return {
       ok: false,
       error: err instanceof ApiError ? err.message : 'Could not update the referral.',
+    };
+  }
+  revalidatePath(`/clinical/${participantUserId}`);
+  return { ok: true };
+}
+
+export async function recordReferralOutcomeAction(
+  referralId: string,
+  participantUserId: string,
+  outcome: ReferralOutcome,
+): Promise<ReferralActionResult> {
+  const session = await auth();
+  if (!session?.user) redirect('/login?reason=session_expired');
+
+  const parsed = RecordReferralOutcomeSchema.safeParse({ outcome });
+  if (!parsed.success) {
+    return { ok: false, error: 'Invalid outcome.' };
+  }
+  try {
+    await apiClient.recordReferralOutcome(session.accessToken, referralId, parsed.data);
+  } catch (err) {
+    return {
+      ok: false,
+      error:
+        err instanceof ApiError ? err.message : 'Could not record the outcome.',
     };
   }
   revalidatePath(`/clinical/${participantUserId}`);

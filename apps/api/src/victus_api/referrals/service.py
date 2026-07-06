@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +21,7 @@ from victus_api.db.models import (
 from victus_api.notifications.service import notify_user
 from victus_api.referrals.schemas import (
     CreateReferralRequest,
+    RecordReferralOutcomeRequest,
     ReferralResponse,
     UpdateReferralStatusRequest,
 )
@@ -39,6 +41,9 @@ def _to_response(row: Referral) -> ReferralResponse:
         urgency=row.urgency.value,
         status=row.status.value,
         notes=row.notes,
+        outcome=row.outcome.value,
+        outcome_recorded_at=row.outcome_recorded_at,
+        outcome_notes=row.outcome_notes,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -170,6 +175,46 @@ async def update_referral_status(
             "participant_id": str(row.participant_user_id),
             "from": previous.value,
             "to": payload.status.value,
+        },
+    )
+    return _to_response(row)
+
+
+async def record_referral_outcome(
+    db: AsyncSession,
+    *,
+    actor: User,
+    referral_id: uuid.UUID,
+    payload: RecordReferralOutcomeRequest,
+    ip_address: str | None,
+    user_agent: str | None,
+) -> ReferralResponse:
+    """Close the care loop: record the facility-confirmed clinical outcome of an
+    onward referral. Audited; the outcome is orthogonal to the administrative
+    ``status`` lifecycle."""
+    row = await db.get(Referral, referral_id)
+    if row is None:
+        raise NotFoundError("Referral not found.")
+
+    previous = row.outcome
+    row.outcome = payload.outcome
+    row.outcome_recorded_at = datetime.now(UTC)
+    if payload.notes is not None:
+        row.outcome_notes = payload.notes
+    await db.flush()
+    await db.refresh(row)
+
+    await write_audit(
+        db,
+        action=AuditAction.REFERRAL_OUTCOME_RECORDED,
+        actor_id=actor.id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        resource=f"referral:{row.id}",
+        metadata={
+            "participant_id": str(row.participant_user_id),
+            "from": previous.value,
+            "to": payload.outcome.value,
         },
     )
     return _to_response(row)

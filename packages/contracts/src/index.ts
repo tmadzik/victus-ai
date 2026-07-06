@@ -1136,6 +1136,29 @@ export const ReferralStatus = {
 } as const;
 export type ReferralStatus = (typeof ReferralStatus)[keyof typeof ReferralStatus];
 
+/** Facility-confirmed clinical outcome of an onward referral (care-loop closure). */
+export const ReferralOutcome = {
+  PENDING: 'PENDING',
+  ATTENDED_CONFIRMED: 'ATTENDED_CONFIRMED',
+  ATTENDED_NOT_CONFIRMED: 'ATTENDED_NOT_CONFIRMED',
+  ATTENDED_INCONCLUSIVE: 'ATTENDED_INCONCLUSIVE',
+  TREATMENT_STARTED: 'TREATMENT_STARTED',
+  DID_NOT_ATTEND: 'DID_NOT_ATTEND',
+  DECLINED_CARE: 'DECLINED_CARE',
+} as const;
+export type ReferralOutcome =
+  (typeof ReferralOutcome)[keyof typeof ReferralOutcome];
+
+export const REFERRAL_OUTCOME_LABELS: Record<ReferralOutcome, string> = {
+  PENDING: 'Awaiting outcome',
+  ATTENDED_CONFIRMED: 'Attended — confirmed',
+  ATTENDED_NOT_CONFIRMED: 'Attended — not confirmed',
+  ATTENDED_INCONCLUSIVE: 'Attended — inconclusive',
+  TREATMENT_STARTED: 'Treatment started',
+  DID_NOT_ATTEND: 'Did not attend',
+  DECLINED_CARE: 'Declined care',
+};
+
 export const ReferralDestinationType = {
   VICTUS_FACILITY: 'VICTUS_FACILITY',
   PRIMARY_HEALTH_CENTRE: 'PRIMARY_HEALTH_CENTRE',
@@ -1193,6 +1216,14 @@ export const UpdateReferralStatusSchema = z.object({
 });
 export type UpdateReferralStatus = z.infer<typeof UpdateReferralStatusSchema>;
 
+export const RecordReferralOutcomeSchema = z.object({
+  outcome: z.nativeEnum(ReferralOutcome),
+  notes: z.string().max(1000).optional().nullable(),
+});
+export type RecordReferralOutcome = z.infer<
+  typeof RecordReferralOutcomeSchema
+>;
+
 export const ReferralResponseSchema = z.object({
   id: z.string().uuid(),
   participant_user_id: z.string().uuid(),
@@ -1204,6 +1235,9 @@ export const ReferralResponseSchema = z.object({
   urgency: z.string(),
   status: z.string(),
   notes: z.string().nullable(),
+  outcome: z.string(),
+  outcome_recorded_at: z.string().nullable(),
+  outcome_notes: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
 });
