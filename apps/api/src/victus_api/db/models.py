@@ -1124,6 +1124,15 @@ class ResearchTriageCase(Base):
         nullable=True,
         index=True,
     )
+    # Provenance when this case was seeded by a facility-confirmed referral
+    # outcome (the care-loop flywheel): the originating Pathway A assessment whose
+    # anthropometrics became this row's features.
+    source_triage_assessment_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("triage_assessments.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     # "CLINICAL_GRADE" | "CHW_TAPE_MEASURE" — measurement provenance (DANN domain).
     capture_domain: Mapped[str] = mapped_column(
         String(32), nullable=False, server_default="CLINICAL_GRADE"
@@ -1275,6 +1284,13 @@ class Referral(Base):
         DateTime(timezone=True), nullable=True
     )
     outcome_notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    # Facility-confirmed glycaemia at the outcome visit — the diabetes ground
+    # truth the non-invasive model never had. When present (with research
+    # consent + a linked source assessment) it seeds a labelled research case.
+    outcome_hba1c_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
+    outcome_fasting_glucose_mmol_l: Mapped[float | None] = mapped_column(
+        Float, nullable=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), index=True

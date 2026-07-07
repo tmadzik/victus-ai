@@ -156,21 +156,6 @@ export function ReferralsPanel({
     });
   }
 
-  function changeOutcome(referralId: string, outcome: ReferralOutcome): void {
-    setError(null);
-    startTransition(async () => {
-      const res = await recordReferralOutcomeAction(
-        referralId,
-        participantId,
-        outcome,
-      );
-      if (!res.ok) {
-        setError(res.error);
-        return;
-      }
-      router.refresh();
-    });
-  }
 
   return (
     <Card>
@@ -332,42 +317,126 @@ export function ReferralsPanel({
                   </div>
                 ) : null}
 
-                {/* Care-loop closure: the facility outcome. */}
-                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-brand-100 pt-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">
-                    Facility outcome
-                  </span>
-                  {r.outcome === 'PENDING' ? (
-                    <span className="text-xs text-brand-500">not yet recorded</span>
-                  ) : (
-                    <Badge tone={OUTCOME_TONE[r.outcome] ?? 'neutral'}>
-                      {REFERRAL_OUTCOME_LABELS[r.outcome as ReferralOutcome] ??
-                        r.outcome}
-                    </Badge>
-                  )}
-                  <select
-                    aria-label="Record facility outcome"
-                    className="ml-auto rounded-[var(--radius-control)] border border-brand-200 bg-white px-2 py-1 text-xs text-brand-900 outline-none focus:border-brand-500"
-                    value=""
-                    disabled={pending}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v) changeOutcome(r.id, v as ReferralOutcome);
-                    }}
-                  >
-                    <option value="">Record outcome…</option>
-                    {OUTCOME_OPTIONS.map((o) => (
-                      <option key={o} value={o}>
-                        {REFERRAL_OUTCOME_LABELS[o]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <OutcomeRecorder
+                  referralId={r.id}
+                  participantId={participantId}
+                  currentOutcome={r.outcome}
+                />
               </li>
             ))}
           </ul>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+const SMALL_INPUT =
+  'rounded-[var(--radius-control)] border border-brand-200 bg-white px-2 py-1 text-xs text-brand-900 outline-none focus:border-brand-500';
+
+// Care-loop closure with the data flywheel: recording a facility outcome, and —
+// on an attended outcome — optionally the confirmed HbA1c / fasting glucose. With
+// the participant's research consent that seeds a labelled training case server-side.
+function OutcomeRecorder({
+  referralId,
+  participantId,
+  currentOutcome,
+}: {
+  referralId: string;
+  participantId: string;
+  currentOutcome: string;
+}): React.ReactElement {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [outcome, setOutcome] = useState<ReferralOutcome | ''>('');
+  const [hba1c, setHba1c] = useState('');
+  const [fpg, setFpg] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  function submit(): void {
+    if (!outcome) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await recordReferralOutcomeAction(referralId, participantId, outcome, {
+        hba1c: hba1c ? Number(hba1c) : null,
+        fpg: fpg ? Number(fpg) : null,
+      });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setOutcome('');
+      setHba1c('');
+      setFpg('');
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="mt-3 space-y-2 border-t border-brand-100 pt-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">
+          Facility outcome
+        </span>
+        {currentOutcome === 'PENDING' ? (
+          <span className="text-xs text-brand-500">not yet recorded</span>
+        ) : (
+          <Badge tone={OUTCOME_TONE[currentOutcome] ?? 'neutral'}>
+            {REFERRAL_OUTCOME_LABELS[currentOutcome as ReferralOutcome] ??
+              currentOutcome}
+          </Badge>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          aria-label="Facility outcome"
+          className={SMALL_INPUT}
+          value={outcome}
+          disabled={pending}
+          onChange={(e) => setOutcome(e.target.value as ReferralOutcome | '')}
+        >
+          <option value="">Record outcome…</option>
+          {OUTCOME_OPTIONS.map((o) => (
+            <option key={o} value={o}>
+              {REFERRAL_OUTCOME_LABELS[o]}
+            </option>
+          ))}
+        </select>
+        <input
+          type="number"
+          step="0.1"
+          placeholder="HbA1c %"
+          aria-label="Confirmed HbA1c percent"
+          className={`${SMALL_INPUT} w-24`}
+          value={hba1c}
+          disabled={pending}
+          onChange={(e) => setHba1c(e.target.value)}
+        />
+        <input
+          type="number"
+          step="0.1"
+          placeholder="FPG mmol/L"
+          aria-label="Confirmed fasting glucose"
+          className={`${SMALL_INPUT} w-28`}
+          value={fpg}
+          disabled={pending}
+          onChange={(e) => setFpg(e.target.value)}
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={pending || !outcome}
+          onClick={submit}
+        >
+          Record
+        </Button>
+      </div>
+      <p className="text-[0.65rem] text-brand-500">
+        Adding a facility HbA1c / glucose (with the participant&apos;s research
+        consent) seeds a labelled training case — closing the data loop.
+      </p>
+      {error ? <p className="text-xs text-rose-700">{error}</p> : null}
+    </div>
   );
 }

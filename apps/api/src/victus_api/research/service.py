@@ -145,6 +145,7 @@ async def create_research_case(
     payload: ResearchCaseCreate,
     created_by: User,
     site_code: str | None = None,
+    source_triage_assessment_id: uuid.UUID | None = None,
 ) -> ResearchCaseResponse:
     bmi = _bmi(payload.height_cm, payload.weight_kg)
     basis: dict[str, str] = {}
@@ -171,6 +172,7 @@ async def create_research_case(
     row = ResearchTriageCase(
         created_by_user_id=created_by.id,
         study_subject_id=payload.study_subject_id,
+        source_triage_assessment_id=source_triage_assessment_id,
         capture_domain=payload.capture_domain.value,
         # Imported field-study rows carry their own site (the study spans SA+NG);
         # interactive console entries default to the creator's deployment site.
