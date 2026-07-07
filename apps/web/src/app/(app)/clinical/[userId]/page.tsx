@@ -4,10 +4,12 @@ import { redirect } from 'next/navigation';
 import {
   type ParticipantHistory,
   type ReferralResponse,
+  type TrajectoryResponse,
   UserRole,
 } from '@victus/contracts';
 
 import { AssessmentTimeline } from '@/components/assessment-timeline';
+import { TrajectoryPanel } from '@/components/trajectory-panel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatLocale } from '@/i18n/config';
@@ -59,6 +61,13 @@ export default async function ParticipantRecordPage({
   }
 
   const p = record.participant;
+  // Longitudinal risk trend — best-effort; a failure must not blank the record.
+  let trajectory: TrajectoryResponse | null = null;
+  try {
+    trajectory = await apiClient.getParticipantTrajectory(session.accessToken, userId);
+  } catch {
+    trajectory = null;
+  }
   // Offer RED triage assessments that don't already have a referral linked.
   const linkedIds = new Set(
     referrals.map((r) => r.source_triage_assessment_id).filter(Boolean),
@@ -99,6 +108,11 @@ export default async function ParticipantRecordPage({
         siteCode={p.site_code}
         referrals={referrals}
         suggestions={suggestions}
+      />
+
+      <TrajectoryPanel
+        trajectory={trajectory}
+        subtitle="across this participant's checks"
       />
 
       <AssessmentTimeline
