@@ -33,7 +33,14 @@ const TYPE_TONE: Record<
   ERASURE_APPROVAL_REQUESTED: { tone: 'yellow', label: 'Approval needed' },
   ERASURE_REQUEST_APPROVED: { tone: 'green', label: 'Approved' },
   ERASURE_REQUEST_REJECTED: { tone: 'red', label: 'Rejected' },
+  REFERRAL_RAISED: { tone: 'brand', label: 'Referral' },
+  RISK_TRAJECTORY_RISE: { tone: 'yellow', label: 'Risk rising' },
   GENERIC: { tone: 'brand', label: 'Notice' },
+};
+
+const FALLBACK_TONE: { tone: 'brand'; label: string } = {
+  tone: 'brand',
+  label: 'Notice',
 };
 
 export function NotificationsClient({
@@ -106,7 +113,7 @@ export function NotificationsClient({
         ) : (
           <ul className="divide-y divide-brand-100">
             {items.map((n) => {
-              const meta = TYPE_TONE[n.type];
+              const meta = TYPE_TONE[n.type] ?? FALLBACK_TONE;
               const isUnread = n.read_at === null;
               return (
                 <li key={n.id}>
