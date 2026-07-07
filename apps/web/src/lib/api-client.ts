@@ -257,6 +257,18 @@ export const apiClient = {
     return TrajectoryResponseSchema.parse(raw);
   },
 
+  async getParticipantTrajectory(
+    accessToken: string,
+    userId: string,
+    limit = 50,
+  ): Promise<TrajectoryResponse> {
+    const raw = await request<unknown>(
+      `/pathways/triage/trajectory/participant/${userId}?limit=${limit}`,
+      { accessToken },
+    );
+    return TrajectoryResponseSchema.parse(raw);
+  },
+
   async assessToi(
     accessToken: string,
     payload: ToiAssessmentRequest,
