@@ -73,13 +73,18 @@ export async function recordReferralOutcomeAction(
   referralId: string,
   participantUserId: string,
   outcome: ReferralOutcome,
+  markers?: { hba1c?: number | null; fpg?: number | null },
 ): Promise<ReferralActionResult> {
   const session = await auth();
   if (!session?.user) redirect('/login?reason=session_expired');
 
-  const parsed = RecordReferralOutcomeSchema.safeParse({ outcome });
+  const parsed = RecordReferralOutcomeSchema.safeParse({
+    outcome,
+    confirmed_hba1c_percent: markers?.hba1c ?? null,
+    confirmed_fasting_glucose_mmol_l: markers?.fpg ?? null,
+  });
   if (!parsed.success) {
-    return { ok: false, error: 'Invalid outcome.' };
+    return { ok: false, error: 'Invalid outcome or lab value.' };
   }
   try {
     await apiClient.recordReferralOutcome(session.accessToken, referralId, parsed.data);

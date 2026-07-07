@@ -32,10 +32,19 @@ class UpdateReferralStatusRequest(BaseModel):
 
 
 class RecordReferralOutcomeRequest(BaseModel):
-    """Close the care loop: the facility-confirmed clinical result."""
+    """Close the care loop: the facility-confirmed clinical result.
+
+    Optional facility glycaemia (HbA1c / fasting glucose) is the diabetes ground
+    truth; supplying it on an attended outcome — with the participant's research
+    consent and a linked source assessment — seeds a labelled research case.
+    """
 
     outcome: ReferralOutcome
     notes: Annotated[str, Field(max_length=1000)] | None = None
+    confirmed_hba1c_percent: Annotated[float, Field(ge=3.0, le=20.0)] | None = None
+    confirmed_fasting_glucose_mmol_l: (
+        Annotated[float, Field(ge=1.0, le=50.0)] | None
+    ) = None
 
 
 class ReferralResponse(BaseModel):
@@ -52,5 +61,7 @@ class ReferralResponse(BaseModel):
     outcome: str
     outcome_recorded_at: datetime | None
     outcome_notes: str | None
+    outcome_hba1c_percent: float | None
+    outcome_fasting_glucose_mmol_l: float | None
     created_at: datetime
     updated_at: datetime

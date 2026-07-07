@@ -1260,6 +1260,9 @@ export type UpdateReferralStatus = z.infer<typeof UpdateReferralStatusSchema>;
 export const RecordReferralOutcomeSchema = z.object({
   outcome: z.nativeEnum(ReferralOutcome),
   notes: z.string().max(1000).optional().nullable(),
+  /** Facility glycaemia (diabetes ground truth) — seeds a labelled case. */
+  confirmed_hba1c_percent: z.number().min(3).max(20).optional().nullable(),
+  confirmed_fasting_glucose_mmol_l: z.number().min(1).max(50).optional().nullable(),
 });
 export type RecordReferralOutcome = z.infer<
   typeof RecordReferralOutcomeSchema
@@ -1279,6 +1282,8 @@ export const ReferralResponseSchema = z.object({
   outcome: z.string(),
   outcome_recorded_at: z.string().nullable(),
   outcome_notes: z.string().nullable(),
+  outcome_hba1c_percent: z.number().nullable(),
+  outcome_fasting_glucose_mmol_l: z.number().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
 });
