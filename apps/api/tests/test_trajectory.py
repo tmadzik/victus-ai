@@ -117,3 +117,43 @@ def test_single_point_is_stable_and_not_significant() -> None:
 
 def test_empty_input_yields_no_trajectories() -> None:
     assert build_trajectories([]) == []
+
+
+# --- rising crossings (the nudge trigger) ------------------------------------
+
+from victus_api.triage.trajectory import rising_crossings  # noqa: E402
+
+
+def _rising_snap(day: int, disease: Disease, vac: float, probs) -> AssessmentSnapshot:
+    return _snap(day, _risk(disease, vacuity=vac, probs=probs))
+
+
+def test_rising_crossing_detected_when_new_point_tips_it_up() -> None:
+    prior = [
+        _rising_snap(0, Disease.DIABETES, 0.05, _LOW),
+        _rising_snap(10, Disease.DIABETES, 0.05, _LOW),
+    ]
+    latest = _snap(20, _risk(Disease.DIABETES, vacuity=0.05, probs=_HIGH))
+    assert rising_crossings(prior, latest) == [Disease.DIABETES]
+
+
+def test_no_crossing_when_already_rising() -> None:
+    # Already rising over prior → the new point is not a fresh crossing.
+    prior = [
+        _rising_snap(0, Disease.DIABETES, 0.05, _LOW),
+        _rising_snap(10, Disease.DIABETES, 0.05, _HIGH),
+    ]
+    latest = _snap(20, _risk(Disease.DIABETES, vacuity=0.05, probs=_HIGH))
+    assert rising_crossings(prior, latest) == []
+
+
+def test_no_crossing_when_change_is_noise() -> None:
+    # High uncertainty → the move is within noise → not a rise.
+    prior = [_rising_snap(0, Disease.DIABETES, 0.95, _LOW)]
+    latest = _snap(20, _risk(Disease.DIABETES, vacuity=0.95, probs=_HIGH))
+    assert rising_crossings(prior, latest) == []
+
+
+def test_no_crossing_with_empty_prior() -> None:
+    latest = _snap(0, _risk(Disease.DIABETES, vacuity=0.05, probs=_HIGH))
+    assert rising_crossings([], latest) == []

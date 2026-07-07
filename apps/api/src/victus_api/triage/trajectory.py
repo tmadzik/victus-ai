@@ -133,3 +133,26 @@ def build_trajectories(
         key=lambda kv: _DISEASE_ORDER.index(kv[0]),
     )
     return [_build_disease_trajectory(d, pts) for d, pts in ordered]
+
+
+def rising_crossings(
+    prior: list[AssessmentSnapshot], latest: AssessmentSnapshot
+) -> list[Disease]:
+    """Diseases that just *crossed* into a significant rise because of ``latest``.
+
+    A crossing is a disease whose trajectory was not RISING over ``prior`` but is
+    RISING once ``latest`` is appended — the tipping point, not a rise that was
+    already flagged. Empty ``prior`` yields nothing (a single point can't trend).
+    """
+    if not prior:
+        return []
+    before = {
+        t.disease: t.direction for t in build_trajectories(prior)
+    }
+    after = build_trajectories([*prior, latest])
+    crossings: list[Disease] = []
+    for traj in after:
+        was_rising = before.get(traj.disease) is TrajectoryDirection.RISING
+        if traj.direction is TrajectoryDirection.RISING and not was_rising:
+            crossings.append(traj.disease)
+    return crossings

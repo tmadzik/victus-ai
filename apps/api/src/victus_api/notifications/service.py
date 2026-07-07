@@ -162,6 +162,49 @@ async def fan_out_to_admins(
     return len(admin_ids)
 
 
+async def _active_site_clinician_ids(
+    db: AsyncSession, *, site_code: str, exclude_user_id: uuid.UUID | None
+) -> list[uuid.UUID]:
+    stmt = select(User.id).where(
+        User.role.in_([UserRole.CLINICIAN, UserRole.ADMIN]),
+        User.is_active.is_(True),
+        User.erased_at.is_(None),
+        User.site_code == site_code,
+    )
+    if exclude_user_id is not None:
+        stmt = stmt.where(User.id != exclude_user_id)
+    return list((await db.scalars(stmt)).all())
+
+
+async def notify_site_clinicians(
+    db: AsyncSession,
+    *,
+    type_: NotificationType,
+    title: str,
+    body: str,
+    site_code: str,
+    resource: str | None = None,
+    payload: dict[str, Any] | None = None,
+    exclude_user_id: uuid.UUID | None = None,
+) -> int:
+    """In-app notification to every active clinician/admin at ``site_code``.
+    Returns the number created (0 if the site has no clinicians)."""
+    ids = await _active_site_clinician_ids(
+        db, site_code=site_code, exclude_user_id=exclude_user_id
+    )
+    for recipient_id in ids:
+        await create_notification(
+            db,
+            recipient_user_id=recipient_id,
+            type_=type_,
+            title=title,
+            body=body,
+            resource=resource,
+            payload=payload,
+        )
+    return len(ids)
+
+
 async def notify_user(
     db: AsyncSession,
     *,

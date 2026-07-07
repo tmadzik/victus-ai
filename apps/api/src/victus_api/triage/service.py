@@ -36,6 +36,7 @@ from victus_api.core.claims import (
 from victus_api.core.logging import get_logger
 from victus_api.db.models import (
     AuditAction,
+    NotificationType,
     User,
 )
 from victus_api.db.models import RiskClass as DbRiskClass
@@ -43,6 +44,7 @@ from victus_api.db.models import (
     TriageAssessment as TriageAssessmentRow,
 )
 from victus_api.db.models import TriageState as DbTriageState
+from victus_api.notifications.service import notify_site_clinicians
 from victus_api.triage.edl.inference import (
     EvidentialPrediction,
     MultiDiseasePrediction,
@@ -74,6 +76,7 @@ from victus_api.triage.trajectory import (
     AssessmentSnapshot,
     DiseaseTrajectory,
     build_trajectories,
+    rising_crossings,
 )
 from victus_api.triage.validation import detect_plausibility_flags
 
@@ -354,6 +357,21 @@ async def assess_triage(
         safety_override=safety.triggered,
     )
 
+    # Prevention nudge: if this assessment tipped a disease into a significant
+    # upward trajectory, alert the participant's site clinicians. Best-effort —
+    # it must never break the assessment itself.
+    try:
+        await _notify_trajectory_rises(
+            db,
+            user=user,
+            latest_per_disease=per_disease_risks,
+            latest_at=row.created_at,
+            exclude_assessment_id=row.id,
+            settings=settings,
+        )
+    except Exception:
+        log.warning("trajectory_rise_notify_failed", exc_info=True)
+
     return _to_response(
         row=row,
         per_disease_risks=per_disease_risks,
@@ -365,6 +383,75 @@ async def assess_triage(
         next_action=overall_next_action,
         mode=resolve_claims_mode(settings),
     )
+
+
+async def _notify_trajectory_rises(
+    db: AsyncSession,
+    *,
+    user: User,
+    latest_per_disease: list[PerDiseaseRisk],
+    latest_at: datetime,
+    exclude_assessment_id: uuid.UUID,
+    settings: Settings,
+) -> list[Disease]:
+    """Fan a nudge to the participant's site clinicians for any disease that just
+    crossed into a significant upward trajectory. Returns the crossings."""
+    stmt = (
+        select(TriageAssessmentRow)
+        .where(
+            TriageAssessmentRow.user_id == user.id,
+            TriageAssessmentRow.id != exclude_assessment_id,
+        )
+        .order_by(desc(TriageAssessmentRow.created_at))
+        .limit(49)
+    )
+    prior_rows = list((await db.scalars(stmt)).all())
+    prior_rows.reverse()  # ascending by time
+    prior = [
+        AssessmentSnapshot(
+            at=r.created_at,
+            per_disease=[
+                PerDiseaseRisk.model_validate(e) for e in (r.per_disease_risks or [])
+            ],
+        )
+        for r in prior_rows
+    ]
+    latest = AssessmentSnapshot(at=latest_at, per_disease=latest_per_disease)
+    crossings = rising_crossings(prior, latest)
+    if not crossings:
+        return []
+
+    labels = ", ".join(d.value.title() for d in crossings)
+    mode = resolve_claims_mode(settings)
+    if mode is ClaimsMode.CLINICAL:
+        title = "Rising NCD risk — participant review"
+        body = (
+            f"A participant at your site has a significant upward risk trajectory "
+            f"({labels}). Open their record to review."
+        )
+    else:
+        title = "Risk-trend signal (research demonstrator)"
+        body = (
+            f"An unvalidated model suggests an upward risk trend ({labels}) for a "
+            "participant at your site. Research-demonstrator signal — not a "
+            "clinical alert."
+        )
+
+    await notify_site_clinicians(
+        db,
+        type_=NotificationType.RISK_TRAJECTORY_RISE,
+        title=title,
+        body=body,
+        site_code=user.site_code,
+        resource=f"/clinical/{user.id}",
+        payload={
+            "participant_id": str(user.id),
+            "diseases": [d.value for d in crossings],
+            "claims_mode": mode.value,
+        },
+        exclude_user_id=user.id,
+    )
+    return crossings
 
 
 async def list_assessments_for_user(
