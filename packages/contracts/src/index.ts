@@ -388,6 +388,52 @@ export const TrajectoryResponseSchema = z.object({
 });
 export type TrajectoryResponse = z.infer<typeof TrajectoryResponseSchema>;
 
+// ---- Contactless (TOI / rPPG) vital-sign trajectory -----------------------
+
+/** The validated, trendable Pathway B biomarkers. */
+export const ToiBiomarker = {
+  HEART_RATE: 'heart_rate',
+  RESPIRATORY_RATE: 'respiratory_rate',
+} as const;
+export type ToiBiomarker = (typeof ToiBiomarker)[keyof typeof ToiBiomarker];
+
+/** Human labels for the biomarker trend cards. */
+export const TOI_BIOMARKER_LABELS: Record<ToiBiomarker, string> = {
+  heart_rate: 'Resting heart rate',
+  respiratory_rate: 'Respiratory rate',
+};
+
+export const ToiTrajectoryPointSchema = z.object({
+  at: z.string(),
+  value: z.number(),
+  /** The measurement's own uncertainty (native units), used as the noise floor. */
+  uncertainty: z.number(),
+});
+export type ToiTrajectoryPoint = z.infer<typeof ToiTrajectoryPointSchema>;
+
+export const BiomarkerTrajectorySchema = z.object({
+  biomarker: z.nativeEnum(ToiBiomarker),
+  label: z.string(),
+  unit: z.string(),
+  baseline_value: z.number(),
+  latest_value: z.number(),
+  delta: z.number(),
+  direction: z.nativeEnum(TrajectoryDirection),
+  /** True only when the change beats the measurement's own uncertainty. */
+  change_is_significant: z.boolean(),
+  points: z.array(ToiTrajectoryPointSchema),
+});
+export type BiomarkerTrajectory = z.infer<typeof BiomarkerTrajectorySchema>;
+
+export const ToiTrajectoryResponseSchema = z.object({
+  user_id: z.string().uuid(),
+  generated_at: z.string(),
+  trajectories: z.array(BiomarkerTrajectorySchema),
+  claims_mode: ClaimsModeSchema,
+  clinical_claims_authorised: z.boolean(),
+});
+export type ToiTrajectoryResponse = z.infer<typeof ToiTrajectoryResponseSchema>;
+
 /**
  * Client-side defence in depth: the wizard checks this before submitting so
  * the user sees the RED state instantly. The API re-checks server-side and is

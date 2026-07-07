@@ -73,6 +73,8 @@ import {
   type ToiAssessmentRequest,
   type ToiAssessmentResponse,
   ToiAssessmentResponseSchema,
+  type ToiTrajectoryResponse,
+  ToiTrajectoryResponseSchema,
   type TrajectoryResponse,
   TrajectoryResponseSchema,
   type TriageAssessmentRequest,
@@ -267,6 +269,18 @@ export const apiClient = {
       { accessToken },
     );
     return TrajectoryResponseSchema.parse(raw);
+  },
+
+  async getParticipantToiTrajectory(
+    accessToken: string,
+    userId: string,
+    limit = 50,
+  ): Promise<ToiTrajectoryResponse> {
+    const raw = await request<unknown>(
+      `/pathways/toi/trajectory/participant/${userId}?limit=${limit}`,
+      { accessToken },
+    );
+    return ToiTrajectoryResponseSchema.parse(raw);
   },
 
   async assessToi(

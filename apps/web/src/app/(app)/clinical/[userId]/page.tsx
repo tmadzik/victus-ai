@@ -4,11 +4,13 @@ import { redirect } from 'next/navigation';
 import {
   type ParticipantHistory,
   type ReferralResponse,
+  type ToiTrajectoryResponse,
   type TrajectoryResponse,
   UserRole,
 } from '@victus/contracts';
 
 import { AssessmentTimeline } from '@/components/assessment-timeline';
+import { ToiTrajectoryPanel } from '@/components/toi-trajectory-panel';
 import { TrajectoryPanel } from '@/components/trajectory-panel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -61,12 +63,23 @@ export default async function ParticipantRecordPage({
   }
 
   const p = record.participant;
-  // Longitudinal risk trend — best-effort; a failure must not blank the record.
+  // Longitudinal trends — best-effort; a failure must not blank the record. The
+  // triage (risk) and TOI (vital-sign) trajectories are fetched independently so
+  // one pathway's absence never hides the other.
   let trajectory: TrajectoryResponse | null = null;
+  let toiTrajectory: ToiTrajectoryResponse | null = null;
   try {
     trajectory = await apiClient.getParticipantTrajectory(session.accessToken, userId);
   } catch {
     trajectory = null;
+  }
+  try {
+    toiTrajectory = await apiClient.getParticipantToiTrajectory(
+      session.accessToken,
+      userId,
+    );
+  } catch {
+    toiTrajectory = null;
   }
   // Offer RED triage assessments that don't already have a referral linked.
   const linkedIds = new Set(
@@ -114,6 +127,8 @@ export default async function ParticipantRecordPage({
         trajectory={trajectory}
         subtitle="across this participant's checks"
       />
+
+      <ToiTrajectoryPanel trajectory={toiTrajectory} />
 
       <AssessmentTimeline
         triage={record.triage}

@@ -9,11 +9,26 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from victus_api.core.claims import ClaimsMode
+
 
 class ToiQuality(str, enum.Enum):
     GOOD = "GOOD"
     DEGRADED = "DEGRADED"
     POOR = "POOR"
+
+
+class ToiBiomarker(str, enum.Enum):
+    """The validated, trendable Pathway B biomarkers (native units)."""
+
+    HEART_RATE = "heart_rate"  # bpm
+    RESPIRATORY_RATE = "respiratory_rate"  # breaths/min
+
+
+class TrajectoryDirection(str, enum.Enum):
+    RISING = "RISING"
+    STABLE = "STABLE"
+    FALLING = "FALLING"
 
 
 class FitzpatrickScale(str, enum.Enum):
@@ -91,3 +106,44 @@ class ToiAssessmentResponse(BaseModel):
     next_action: str
     pipeline_version: str
     created_at: datetime
+
+
+# --- Longitudinal trajectory (Pathway B) -------------------------------------
+
+
+class ToiTrajectoryPointResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    at: datetime
+    value: float
+    # The measurement's own uncertainty (native units) used as the noise floor —
+    # a change smaller than this is treated as run-to-run noise, not a trend.
+    uncertainty: float
+
+
+class BiomarkerTrajectoryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    biomarker: ToiBiomarker
+    label: str
+    unit: str
+    baseline_value: float
+    latest_value: float
+    delta: float
+    direction: TrajectoryDirection
+    # True only when the change exceeds the combined measurement uncertainty of
+    # its endpoints — i.e. a real move, not run-to-run noise.
+    change_is_significant: bool
+    points: list[ToiTrajectoryPointResponse]
+
+
+class ToiTrajectoryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: uuid.UUID
+    generated_at: datetime
+    trajectories: list[BiomarkerTrajectoryResponse]
+    # Same gate as the point-in-time assessment: a derived analytic of an
+    # unvalidated pipeline, not an actionable clinical trend until the gate opens.
+    claims_mode: ClaimsMode
+    clinical_claims_authorised: bool
