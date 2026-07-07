@@ -49,6 +49,8 @@ import {
   ParticipantHistorySchema,
   type ParticipantSummary,
   ParticipantSummarySchema,
+  type CareLoopStats,
+  CareLoopStatsSchema,
   type CreateReferral,
   type RecordReferralOutcome,
   type ReferralResponse,
@@ -713,6 +715,13 @@ export const apiClient = {
       body: payload,
     });
     return ReferralResponseSchema.parse(raw);
+  },
+
+  async getCareLoopStats(accessToken: string): Promise<CareLoopStats> {
+    const raw = await request<unknown>('/referrals/analytics/care-loop', {
+      accessToken,
+    });
+    return CareLoopStatsSchema.parse(raw);
   },
 
   // ---- Clinician participant review ---------------------------------------

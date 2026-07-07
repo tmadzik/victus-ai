@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 
 import {
   type AcquisitionWorklistItem,
+  type CareLoopStats,
   DISEASES,
   DISEASE_LABELS,
   type ResearchCaseResponse,
@@ -46,10 +47,11 @@ export default async function ResearchPage(): Promise<React.ReactElement> {
   if (!session?.user) redirect('/login');
   if (!RESEARCHER_ROLES.includes(session.user.role)) redirect('/dashboard');
 
-  const [stats, cases, worklist] = await Promise.all([
+  const [stats, cases, worklist, careLoop] = await Promise.all([
     apiClient.getResearchStats(session.accessToken),
     apiClient.listResearchCases(session.accessToken, 25),
     apiClient.getAcquisitionWorklist(session.accessToken, 25),
+    apiClient.getCareLoopStats(session.accessToken).catch(() => null),
   ]);
 
   return (
@@ -77,6 +79,8 @@ export default async function ResearchPage(): Promise<React.ReactElement> {
 
       <Dashboard stats={stats} />
 
+      <CareLoopPanel stats={careLoop} />
+
       <AcquisitionWorklist items={worklist} />
 
       <ResearchCaptureForm />
@@ -91,6 +95,76 @@ const PRIORITY_BADGE: Record<AcquisitionWorklistItem['priority'], string> = {
   MEDIUM: 'bg-amber-100 text-amber-800 ring-amber-300',
   LOW: 'bg-brand-100 text-brand-700 ring-brand-300',
 };
+
+function pctLabel(x: number): string {
+  return `${Math.round(x * 100)}%`;
+}
+
+function CareLoopPanel({
+  stats,
+}: {
+  stats: CareLoopStats | null;
+}): React.ReactElement | null {
+  if (!stats || stats.referrals_total === 0) return null;
+  const total = stats.referrals_total;
+  const funnel = [
+    { label: 'Referrals raised', n: total },
+    { label: 'Outcome recorded', n: stats.outcomes_recorded },
+    { label: 'Attended facility', n: stats.attended },
+    { label: 'Diagnosis confirmed', n: stats.confirmed },
+  ];
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">
+          Care loop{' '}
+          <span className="text-sm font-normal text-brand-600">
+            referral → outcome → training data
+          </span>
+        </CardTitle>
+        <p className="mt-1 max-w-3xl text-sm text-brand-700">
+          Does the loop close? Screening only helps if flagged participants reach
+          care — and every confirmed outcome, with consent, becomes a labelled
+          training case. That&apos;s the data flywheel.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="space-y-2">
+          {funnel.map((f) => (
+            <div key={f.label}>
+              <div className="mb-1 flex justify-between text-xs">
+                <span className="text-brand-700">{f.label}</span>
+                <span className="font-mono text-brand-700">{f.n}</span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-brand-100">
+                <div
+                  className="h-full bg-brand-500"
+                  style={{ width: `${(f.n / total) * 100}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Metric label="Loop closure" value={pctLabel(stats.closure_rate)} />
+          <Metric label="Attendance" value={pctLabel(stats.attendance_rate)} />
+          <Metric label="Confirmation" value={pctLabel(stats.confirmation_rate)} />
+          <Metric label="Cases seeded" value={String(stats.research_cases_seeded)} />
+        </div>
+        <p className="text-xs text-brand-600">
+          <span className="font-semibold text-brand-800">
+            {stats.research_cases_seeded}
+          </span>{' '}
+          labelled training case(s) produced by the loop from{' '}
+          <span className="font-semibold text-brand-800">
+            {stats.with_source_assessment}
+          </span>{' '}
+          referral(s) linkable to a Pathway A capture.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
 
 function AcquisitionWorklist({
   items,

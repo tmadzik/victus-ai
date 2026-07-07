@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from victus_api.audit.service import write_audit
@@ -26,6 +26,7 @@ from victus_api.db.models import (
 )
 from victus_api.notifications.service import notify_user
 from victus_api.referrals.schemas import (
+    CareLoopStats,
     CreateReferralRequest,
     RecordReferralOutcomeRequest,
     ReferralResponse,
@@ -70,6 +71,73 @@ def _to_response(row: Referral) -> ReferralResponse:
         outcome_fasting_glucose_mmol_l=row.outcome_fasting_glucose_mmol_l,
         created_at=row.created_at,
         updated_at=row.updated_at,
+    )
+
+
+def _rate(numerator: int, denominator: int) -> float:
+    return round(numerator / denominator, 4) if denominator > 0 else 0.0
+
+
+async def care_loop_stats(db: AsyncSession) -> CareLoopStats:
+    """Aggregate the care loop: the referral → attended → confirmed funnel, plus
+    how many labelled training cases the flywheel has produced. A funder / QA
+    view of whether the loop actually closes."""
+    total = int(await db.scalar(select(func.count(Referral.id))) or 0)
+    with_source = int(
+        await db.scalar(
+            select(func.count(Referral.id)).where(
+                Referral.source_triage_assessment_id.is_not(None)
+            )
+        )
+        or 0
+    )
+    by_status = {
+        s.value: 0 for s in ReferralStatus
+    }
+    for status_val, count in (
+        await db.execute(
+            select(Referral.status, func.count(Referral.id)).group_by(Referral.status)
+        )
+    ).all():
+        by_status[status_val.value] = int(count)
+
+    by_outcome = {o.value: 0 for o in ReferralOutcome}
+    for outcome_val, count in (
+        await db.execute(
+            select(Referral.outcome, func.count(Referral.id)).group_by(
+                Referral.outcome
+            )
+        )
+    ).all():
+        by_outcome[outcome_val.value] = int(count)
+
+    outcomes_recorded = total - by_outcome.get(ReferralOutcome.PENDING.value, 0)
+    attended = sum(by_outcome.get(o.value, 0) for o in _ATTENDED_OUTCOMES)
+    confirmed = by_outcome.get(
+        ReferralOutcome.ATTENDED_CONFIRMED.value, 0
+    ) + by_outcome.get(ReferralOutcome.TREATMENT_STARTED.value, 0)
+
+    seeded = int(
+        await db.scalar(
+            select(func.count(ResearchTriageCase.id)).where(
+                ResearchTriageCase.source_triage_assessment_id.is_not(None)
+            )
+        )
+        or 0
+    )
+
+    return CareLoopStats(
+        referrals_total=total,
+        with_source_assessment=with_source,
+        by_status=by_status,
+        by_outcome=by_outcome,
+        outcomes_recorded=outcomes_recorded,
+        attended=attended,
+        confirmed=confirmed,
+        research_cases_seeded=seeded,
+        closure_rate=_rate(outcomes_recorded, total),
+        attendance_rate=_rate(attended, outcomes_recorded),
+        confirmation_rate=_rate(confirmed, attended),
     )
 
 

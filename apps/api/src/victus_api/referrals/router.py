@@ -15,12 +15,14 @@ from victus_api.config import Settings, get_settings
 from victus_api.core.deps import CurrentUser, DbSession, require_role
 from victus_api.db.models import UserRole
 from victus_api.referrals.schemas import (
+    CareLoopStats,
     CreateReferralRequest,
     RecordReferralOutcomeRequest,
     ReferralResponse,
     UpdateReferralStatusRequest,
 )
 from victus_api.referrals.service import (
+    care_loop_stats,
     create_referral,
     list_my_referrals,
     list_referrals_for_participant,
@@ -59,6 +61,15 @@ async def create_endpoint(
     return await create_referral(
         db, actor=user, settings=settings, payload=payload, ip_address=ip, user_agent=ua
     )
+
+
+@router.get(
+    "/analytics/care-loop",
+    response_model=CareLoopStats,
+    summary="Care-loop funnel + flywheel corpus growth (CHW/clinician/admin).",
+)
+async def care_loop_endpoint(db: DbSession, _user: ReferrerUser) -> CareLoopStats:
+    return await care_loop_stats(db)
 
 
 @router.get(
