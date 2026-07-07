@@ -11,10 +11,12 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from victus_api.audit.service import write_audit
-from victus_api.config import get_settings
+from victus_api.config import Settings, get_settings
+from victus_api.core.claims import ClaimsMode, resolve_claims_mode
 from victus_api.core.logging import get_logger
 from victus_api.db.models import (
     AuditAction,
+    NotificationType,
     User,
 )
 from victus_api.db.models import (
@@ -26,6 +28,7 @@ from victus_api.db.models import (
 from victus_api.db.models import (
     ToiQuality as DbToiQuality,
 )
+from victus_api.notifications.service import notify_site_clinicians
 from victus_api.toi.corrector import get_corrector
 from victus_api.toi.schemas import (
     BiomarkerEstimate,
@@ -35,6 +38,13 @@ from victus_api.toi.schemas import (
     ToiQuality,
 )
 from victus_api.toi.signal.pipeline import PipelineOutput, run_rppg_pipeline
+from victus_api.toi.trajectory import (
+    BIOMARKER_LABELS,
+    BiomarkerReading,
+    ToiBiomarker,
+    ToiSnapshot,
+    rising_crossings,
+)
 
 log = get_logger(__name__)
 
@@ -171,12 +181,111 @@ async def assess_toi(
         hr_bpm=pipeline.heart_rate_bpm,
     )
 
+    # Prevention nudge: if this contactless check tipped a validated vital sign
+    # into a significant upward trend, alert the participant's site clinicians.
+    # Best-effort — it must never break the assessment itself. Reaches every
+    # capture channel, including the Mobile Clinic Gateway kiosk worker.
+    try:
+        await _notify_toi_trajectory_rises(
+            db, user=user, latest_row=row, settings=get_settings()
+        )
+    except Exception:
+        log.warning("toi_trajectory_rise_notify_failed", exc_info=True)
+
     return _to_response(
         row=row,
         biomarkers=_visible_biomarkers(biomarkers_dto),
         signal_quality=signal_quality,
         pipeline=pipeline,
     )
+
+
+def _snapshot_from_row(row: ToiAssessmentRow) -> ToiSnapshot:
+    """Build a trajectory snapshot from a persisted assessment, carrying only the
+    validated biomarkers (HR, RR) with their confidence intervals."""
+    readings: dict[ToiBiomarker, BiomarkerReading] = {}
+    if row.heart_rate_bpm is not None:
+        readings[ToiBiomarker.HEART_RATE] = BiomarkerReading(
+            value=row.heart_rate_bpm,
+            ci_low=row.heart_rate_ci_low,
+            ci_high=row.heart_rate_ci_high,
+        )
+    if row.respiratory_rate_bpm is not None:
+        readings[ToiBiomarker.RESPIRATORY_RATE] = BiomarkerReading(
+            value=row.respiratory_rate_bpm,
+            ci_low=row.respiratory_rate_ci_low,
+            ci_high=row.respiratory_rate_ci_high,
+        )
+    return ToiSnapshot(
+        at=row.created_at,
+        quality=ToiQuality(row.quality.value),
+        readings=readings,
+    )
+
+
+async def _notify_toi_trajectory_rises(
+    db: AsyncSession,
+    *,
+    user: User,
+    latest_row: ToiAssessmentRow,
+    settings: Settings,
+) -> list[ToiBiomarker]:
+    """Fan a nudge to the participant's site clinicians for any validated vital
+    sign that just crossed into a significant upward trend. Returns the
+    crossings. A POOR or biomarker-less capture never nudges."""
+    latest = _snapshot_from_row(latest_row)
+    if latest.quality is ToiQuality.POOR or not latest.readings:
+        return []
+
+    stmt = (
+        select(ToiAssessmentRow)
+        .where(
+            ToiAssessmentRow.user_id == user.id,
+            ToiAssessmentRow.id != latest_row.id,
+        )
+        .order_by(desc(ToiAssessmentRow.created_at))
+        .limit(49)
+    )
+    prior_rows = list((await db.scalars(stmt)).all())
+    prior_rows.reverse()  # ascending by time
+    prior = [_snapshot_from_row(r) for r in prior_rows]
+
+    crossings = rising_crossings(prior, latest)
+    if not crossings:
+        return []
+
+    labels = ", ".join(BIOMARKER_LABELS[b] for b in crossings)
+    mode = resolve_claims_mode(settings)
+    if mode is ClaimsMode.CLINICAL:
+        title = "Rising vital-sign trend — participant review"
+        body = (
+            f"A participant at your site shows a significant upward trend in "
+            f"{labels} across contactless checks. Open their record to review."
+        )
+    else:
+        title = "Vital-sign trend signal (research demonstrator)"
+        body = (
+            f"An unvalidated contactless measurement suggests an upward trend in "
+            f"{labels} for a participant at your site. Research-demonstrator "
+            "signal — not a clinical alert."
+        )
+
+    await notify_site_clinicians(
+        db,
+        type_=NotificationType.RISK_TRAJECTORY_RISE,
+        title=title,
+        body=body,
+        site_code=user.site_code,
+        resource=f"/clinical/{user.id}",
+        payload={
+            "participant_id": str(user.id),
+            "biomarkers": [b.value for b in crossings],
+            "claims_mode": mode.value,
+            "source": "TOI",
+        },
+        exclude_user_id=user.id,
+    )
+    return crossings
 
 
 async def list_assessments_for_user(
