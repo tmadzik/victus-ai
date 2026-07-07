@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import replace
+from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
@@ -32,17 +33,23 @@ from victus_api.notifications.service import notify_site_clinicians
 from victus_api.toi.corrector import get_corrector
 from victus_api.toi.schemas import (
     BiomarkerEstimate,
+    BiomarkerTrajectoryResponse,
     SignalQuality,
     ToiAssessmentRequest,
     ToiAssessmentResponse,
     ToiQuality,
+    ToiTrajectoryPointResponse,
+    ToiTrajectoryResponse,
 )
 from victus_api.toi.signal.pipeline import PipelineOutput, run_rppg_pipeline
 from victus_api.toi.trajectory import (
     BIOMARKER_LABELS,
+    BIOMARKER_UNITS,
     BiomarkerReading,
+    BiomarkerTrajectory,
     ToiBiomarker,
     ToiSnapshot,
+    build_toi_trajectories,
     rising_crossings,
 )
 
@@ -302,6 +309,60 @@ async def list_assessments_for_user(
     )
     rows = (await db.scalars(stmt)).all()
     return [_row_to_response(r) for r in rows]
+
+
+def _toi_trajectory_to_response(
+    traj: BiomarkerTrajectory,
+) -> BiomarkerTrajectoryResponse:
+    return BiomarkerTrajectoryResponse(
+        biomarker=traj.biomarker,
+        label=BIOMARKER_LABELS[traj.biomarker],
+        unit=BIOMARKER_UNITS[traj.biomarker],
+        baseline_value=traj.baseline_value,
+        latest_value=traj.latest_value,
+        delta=traj.delta,
+        direction=traj.direction,
+        change_is_significant=traj.change_is_significant,
+        points=[
+            ToiTrajectoryPointResponse(
+                at=p.at, value=p.value, uncertainty=round(p.uncertainty, 3)
+            )
+            for p in traj.points
+        ],
+    )
+
+
+async def toi_trajectory_for_user(
+    db: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    limit: int = 50,
+) -> ToiTrajectoryResponse:
+    """Per-biomarker longitudinal trajectory from a participant's contactless
+    checks — the Pathway B counterpart to the triage risk trajectory.
+
+    Screening → prevention: shows whether each validated vital sign is moving,
+    and calls a change *significant* only when it exceeds the measurement's own
+    confidence-interval uncertainty (so noise is not mistaken for a trend)."""
+    stmt = (
+        select(ToiAssessmentRow)
+        .where(ToiAssessmentRow.user_id == user_id)
+        .order_by(desc(ToiAssessmentRow.created_at))
+        .limit(limit)
+    )
+    rows = list((await db.scalars(stmt)).all())
+    rows.reverse()  # ascending by time for the trajectory
+    snapshots = [_snapshot_from_row(r) for r in rows]
+    mode = resolve_claims_mode(get_settings())
+    return ToiTrajectoryResponse(
+        user_id=user_id,
+        generated_at=datetime.now(UTC),
+        trajectories=[
+            _toi_trajectory_to_response(t) for t in build_toi_trajectories(snapshots)
+        ],
+        claims_mode=mode,
+        clinical_claims_authorised=mode is ClaimsMode.CLINICAL,
+    )
 
 
 # --- Helpers -----------------------------------------------------------------

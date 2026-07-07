@@ -2,14 +2,23 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request, status
 
 from victus_api.core.deps import CurrentUser, DbSession, require_consent, require_role
 from victus_api.db.models import ConsentType, UserRole
-from victus_api.toi.schemas import ToiAssessmentRequest, ToiAssessmentResponse
-from victus_api.toi.service import assess_toi, list_assessments_for_user
+from victus_api.toi.schemas import (
+    ToiAssessmentRequest,
+    ToiAssessmentResponse,
+    ToiTrajectoryResponse,
+)
+from victus_api.toi.service import (
+    assess_toi,
+    list_assessments_for_user,
+    toi_trajectory_for_user,
+)
 
 router = APIRouter(prefix="/pathways/toi", tags=["pathway-b-toi"])
 
@@ -63,3 +72,37 @@ async def list_my_assessments(
     limit: Annotated[int, Query(ge=1, le=100)] = 25,
 ) -> list[ToiAssessmentResponse]:
     return await list_assessments_for_user(db, user_id=user.id, limit=limit)
+
+
+@router.get(
+    "/trajectory/me",
+    response_model=ToiTrajectoryResponse,
+    summary="The authenticated user's longitudinal contactless vital-sign trend.",
+)
+async def my_toi_trajectory(
+    db: DbSession,
+    user: Annotated[
+        CurrentUser, Depends(require_role(UserRole.PATIENT, UserRole.CLINICIAN))
+    ],
+    _consent: Annotated[
+        CurrentUser, Depends(require_consent(ConsentType.TOI_IMAGING))
+    ],
+    limit: Annotated[int, Query(ge=2, le=100)] = 50,
+) -> ToiTrajectoryResponse:
+    return await toi_trajectory_for_user(db, user_id=user.id, limit=limit)
+
+
+@router.get(
+    "/trajectory/participant/{user_id}",
+    response_model=ToiTrajectoryResponse,
+    summary="A participant's contactless vital-sign trajectory (clinician/admin).",
+)
+async def participant_toi_trajectory(
+    db: DbSession,
+    _user: Annotated[
+        CurrentUser, Depends(require_role(UserRole.CLINICIAN, UserRole.ADMIN))
+    ],
+    user_id: uuid.UUID,
+    limit: Annotated[int, Query(ge=2, le=100)] = 50,
+) -> ToiTrajectoryResponse:
+    return await toi_trajectory_for_user(db, user_id=user_id, limit=limit)

@@ -30,25 +30,35 @@ clinical-claims layer at the surface.
 
 from __future__ import annotations
 
-import enum
 from dataclasses import dataclass
 from datetime import datetime
 
-from victus_api.toi.schemas import ToiQuality
+from victus_api.toi.schemas import ToiBiomarker, ToiQuality, TrajectoryDirection
 
-
-class ToiBiomarker(str, enum.Enum):
-    """The validated, trendable Pathway B biomarkers (native units)."""
-
-    HEART_RATE = "heart_rate"  # bpm
-    RESPIRATORY_RATE = "respiratory_rate"  # breaths/min
-
+# Re-export so callers can keep importing the trajectory vocabulary from one
+# place; the enums live in ``schemas`` to break the DTO import cycle.
+__all__ = [
+    "BIOMARKER_LABELS",
+    "BIOMARKER_UNITS",
+    "BiomarkerReading",
+    "BiomarkerTrajectory",
+    "ToiBiomarker",
+    "ToiSnapshot",
+    "TrajectoryDirection",
+    "TrajectoryPoint",
+    "build_toi_trajectories",
+    "rising_crossings",
+]
 
 # Presentation order + human labels for notification copy.
 _BIOMARKER_ORDER: list[ToiBiomarker] = list(ToiBiomarker)
 BIOMARKER_LABELS: dict[ToiBiomarker, str] = {
     ToiBiomarker.HEART_RATE: "resting heart rate",
     ToiBiomarker.RESPIRATORY_RATE: "respiratory rate",
+}
+BIOMARKER_UNITS: dict[ToiBiomarker, str] = {
+    ToiBiomarker.HEART_RATE: "bpm",
+    ToiBiomarker.RESPIRATORY_RATE: "breaths/min",
 }
 
 # Per-biomarker absolute noise floor (native units) used when a capture lacks a
@@ -67,12 +77,6 @@ SIGNIFICANCE_K = 1.0
 
 # Captures at or below this quality are excluded from every trajectory.
 _EXCLUDED_QUALITY = frozenset({ToiQuality.POOR})
-
-
-class TrajectoryDirection(str, enum.Enum):
-    RISING = "RISING"
-    STABLE = "STABLE"
-    FALLING = "FALLING"
 
 
 @dataclass(frozen=True)
