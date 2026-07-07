@@ -1289,6 +1289,25 @@ export const ReferralResponseSchema = z.object({
 });
 export type ReferralResponse = z.infer<typeof ReferralResponseSchema>;
 
+/**
+ * Care-loop analytics — does the loop close? The referral → attended → confirmed
+ * funnel plus the flywheel's contribution to the labelled training corpus.
+ */
+export const CareLoopStatsSchema = z.object({
+  referrals_total: z.number().int().nonnegative(),
+  with_source_assessment: z.number().int().nonnegative(),
+  by_status: z.record(z.string(), z.number()),
+  by_outcome: z.record(z.string(), z.number()),
+  outcomes_recorded: z.number().int().nonnegative(),
+  attended: z.number().int().nonnegative(),
+  confirmed: z.number().int().nonnegative(),
+  research_cases_seeded: z.number().int().nonnegative(),
+  closure_rate: z.number(),
+  attendance_rate: z.number(),
+  confirmation_rate: z.number(),
+});
+export type CareLoopStats = z.infer<typeof CareLoopStatsSchema>;
+
 // ===========================================================================
 // MOBILE CLINIC GATEWAY (kiosk rail)
 // ===========================================================================

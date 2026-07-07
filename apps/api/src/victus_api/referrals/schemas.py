@@ -47,6 +47,23 @@ class RecordReferralOutcomeRequest(BaseModel):
     ) = None
 
 
+class CareLoopStats(BaseModel):
+    """Does the loop close? Funnel from referral → attended → confirmed, plus the
+    flywheel's contribution to the labelled training corpus."""
+
+    referrals_total: int
+    with_source_assessment: int  # linkable back to a Pathway A capture
+    by_status: dict[str, int]
+    by_outcome: dict[str, int]
+    outcomes_recorded: int  # outcome != PENDING
+    attended: int
+    confirmed: int  # ATTENDED_CONFIRMED + TREATMENT_STARTED
+    research_cases_seeded: int  # labelled cases the flywheel produced
+    closure_rate: float  # outcomes_recorded / referrals_total
+    attendance_rate: float  # attended / outcomes_recorded
+    confirmation_rate: float  # confirmed / attended
+
+
 class ReferralResponse(BaseModel):
     id: uuid.UUID
     participant_user_id: uuid.UUID
