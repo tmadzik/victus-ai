@@ -1,0 +1,29 @@
+# Automatic HTTPS (Let's Encrypt) + reverse proxy for the Victus stack.
+# Domains and ACME email are injected from the environment by docker-compose.
+{
+	email {$ACME_EMAIL}
+}
+
+# Marketing site.
+{$WWW_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy marketing:3000
+}
+
+# Apex → www (so victusdata.com reaches the marketing site).
+{$ROOT_DOMAIN} {
+	redir https://{$WWW_DOMAIN}{uri} permanent
+}
+
+# Clinical web app. HTTPS is required here — the rPPG capture needs a secure
+# context for camera access (Caddy serves HTTPS by default).
+{$APP_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:3000
+}
+
+# API.
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api:8000
+}

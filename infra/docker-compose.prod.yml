@@ -1,0 +1,151 @@
+# Victus AI — single-host production stack for a Hostinger VPS (KVM + Docker).
+#
+#   www.victusdata.com  → marketing   (Next.js)
+#   app.victusdata.com  → web         (Next.js clinical app)
+#   api.victusdata.com  → api         (FastAPI + Postgres)
+#
+# Caddy terminates TLS (automatic Let's Encrypt) and reverse-proxies each
+# hostname. One command brings the whole platform up:
+#
+#   docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.production up -d --build
+#
+# All values come from infra/.env.production (copy from .env.production.example).
+name: victus-ai-prod
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    image: victus-api:local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      API_ENV: production
+      RUN_MIGRATIONS: "1"
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      ALEMBIC_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      PSEUDO_SALT: ${PSEUDO_SALT}
+      KIOSK_ENCRYPTION_KEY: ${KIOSK_ENCRYPTION_KEY}
+      CORS_ALLOWED_ORIGINS: ${PUBLIC_APP_URL},${PUBLIC_WWW_URL}
+      WEB_APP_BASE_URL: ${PUBLIC_APP_URL}
+      SITE_CODE: ${SITE_CODE:-DEMO}
+      # Clinical-claims gate is intentionally LEFT OFF → the platform runs as a
+      # research demonstrator (honest default; the models are not yet clinically
+      # validated). Do not enable without a validated model card.
+    healthcheck:
+      test:
+        ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_URL}
+    image: victus-web:local
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_URL}
+      INTERNAL_API_BASE_URL: http://api:8000
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_URL: ${PUBLIC_APP_URL}
+      AUTH_TRUST_HOST: "true"
+
+  marketing:
+    build:
+      context: ..
+      dockerfile: apps/marketing/Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: ${PUBLIC_APP_URL}
+    image: victus-marketing:local
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_APP_URL: ${PUBLIC_APP_URL}
+      # Optional — the "request a pilot" form emails through these if set.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      LEAD_NOTIFY_TO: ${LEAD_NOTIFY_TO:-}
+      LEAD_NOTIFY_FROM: ${LEAD_NOTIFY_FROM:-}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+      - marketing
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      ROOT_DOMAIN: ${ROOT_DOMAIN}
+      WWW_DOMAIN: ${WWW_DOMAIN}
+      APP_DOMAIN: ${APP_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # WhatsApp capture worker — OFF by default (demo needs no background process).
+  # Enable with:  docker compose ... --profile whatsapp up -d
+  # NOTE: real WhatsApp media decoding also needs the `opencv-python-headless`
+  # package added to the API image; see HOSTINGER.md.
+  worker:
+    image: victus-api:local
+    restart: unless-stopped
+    profiles: ["whatsapp"]
+    depends_on:
+      api:
+        condition: service_healthy
+    command: ["python", "-m", "victus_api.worker", "--loop"]
+    environment:
+      API_ENV: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      PSEUDO_SALT: ${PSEUDO_SALT}
+      KIOSK_ENCRYPTION_KEY: ${KIOSK_ENCRYPTION_KEY}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+
+volumes:
+  postgres_data:
+    name: victus_prod_postgres_data
+  caddy_data:
+    name: victus_prod_caddy_data
+  caddy_config:
+    name: victus_prod_caddy_config

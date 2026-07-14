@@ -1,0 +1,14 @@
+# Keep the API build context small and deterministic.
+.venv
+**/__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.mypy_cache
+htmlcov
+.coverage
+*.log
+tests
+# Trained checkpoints are large and unused by the torch-free image (rule-based
+# backend). Add torch + set VICTUS_TRIAGE_MODEL_PATH if you want them.
+models/*.pt
