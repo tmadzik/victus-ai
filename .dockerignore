@@ -1,0 +1,26 @@
+# Root build context ignore — used by the web + marketing image builds (context
+# is the monorepo root). Keeps node_modules / build artefacts / secrets out of
+# the context so `pnpm install --frozen-lockfile` runs clean and reproducibly.
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+**/dist-cpanel
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/coverage
+**/*.log
+.git
+.github
+.claude
+_legacy
+# Never bake env files into an image.
+**/.env
+**/.env.*
+!**/.env.example
+# Large model checkpoints are for the API image only (and excluded there too).
+apps/api/models/*.pt
