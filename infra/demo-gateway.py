@@ -97,20 +97,59 @@ def step(n: int, title: str) -> None:
     print(f"\n{BOLD}{n}. {title}{OFF}")
 
 
+def open_session_on_screen() -> tuple[str, str] | None:
+    """Find the session the kiosk terminal is currently displaying.
+
+    The QR deep-links to a WhatsApp number that doesn't exist in a demo, so
+    scanning it dead-ends. Instead we adopt that exact session and drive it —
+    the kiosk polls its own status, so the SCREEN advances by itself.
+    """
+    sql = ("SELECT id, verification_nonce FROM kiosk_sessions "
+           "WHERE status IN ('INITIATED','LINKED') AND expires_at > now() "
+           "ORDER BY created_at DESC LIMIT 1;")
+    try:
+        done = subprocess.run(
+            [*COMPOSE, "exec", "-T", "postgres", "psql", "-tAF,", "-U", "victus",
+             "-d", "victus", "-c", sql],
+            capture_output=True, text=True, timeout=30)
+        line = next((ln for ln in done.stdout.strip().splitlines() if "," in ln), "")
+        sid, _, nonce = line.partition(",")
+        return (sid.strip(), nonce.strip()) if sid.strip() and nonce.strip() else None
+    except Exception:
+        return None
+
+
 def main() -> int:
     kiosk_auth = {"X-Kiosk-Id": KIOSK_ID, "X-Kiosk-Token": KIOSK_TOKEN}
+    on_screen = any(a in sys.argv[1:] for a in ("--on-screen", "--scan"))
+
     print(f"\n{BOLD}Mobile Clinic Gateway — end-to-end walk-up demo{OFF}")
     print(f"{DIM}Real kiosk, webhook, worker, encryption and OTP gate. "
           f"Meta is stood in for locally.{OFF}")
 
-    step(1, "A participant walks up — the terminal opens a session")
-    # The terminal identifies itself by header; the endpoint takes no body.
-    session = call("POST", "/kiosk/sessions", {}, kiosk_auth)
-    sid, nonce = session["id"], session["verification_nonce"]
-    print(f"   session   {sid}")
-    print(f"   QR text   {GREEN}{session['qr_text']}{OFF}")
-    print(f"   deep link {session.get('whatsapp_deep_link') or '(no number configured)'}")
-    print(f"   {DIM}On a real terminal this is a QR code on screen.{OFF}")
+    if on_screen:
+        step(1, "Adopting the session already on the kiosk screen")
+        found = open_session_on_screen()
+        if not found:
+            print("   No session is waiting. Open http://localhost:3000/kiosk and")
+            print("   start a check-up so the QR screen is showing, then re-run.")
+            return 1
+        sid, nonce = found
+        session = {"id": sid, "verification_nonce": nonce,
+                   "qr_text": f"VICTUS-KIOSK {nonce}"}
+        print(f"   session  {sid}")
+        print(f"   code     {GREEN}{nonce}{OFF} {DIM}— should match the screen{OFF}")
+        print(f"\n   {BOLD}Watch the kiosk screen. It will move on its own.{OFF}")
+        time.sleep(2)
+    else:
+        step(1, "A participant walks up — the terminal opens a session")
+        # The terminal identifies itself by header; the endpoint takes no body.
+        session = call("POST", "/kiosk/sessions", {}, kiosk_auth)
+        sid, nonce = session["id"], session["verification_nonce"]
+        print(f"   session   {sid}")
+        print(f"   QR text   {GREEN}{session['qr_text']}{OFF}")
+        print(f"   deep link {session.get('whatsapp_deep_link') or '(no number configured)'}")
+        print(f"   {DIM}On a real terminal this is a QR code on screen.{OFF}")
 
     step(2, "They scan it — WhatsApp opens pre-filled, they hit send")
     whatsapp_says(session["qr_text"])
@@ -129,16 +168,24 @@ def main() -> int:
         print(f"   status → {GREEN}{st['status']}{OFF}   consented={st['consented']}")
 
     step(4, "The camera capture — only derived signals leave the terminal")
-    call("POST", f"/kiosk/sessions/{sid}/capture", {
-        "signal_quality_index": 0.91, "illumination_score": 0.88,
-        "face_bbox_ratio": 0.34, "frame_count": 450, "error_flags": [],
-        "rppg_signal": synth_signal(),
-    }, kiosk_auth)
-    print("   captured → queued for the worker")
-    print(f"   {DIM}No frames are stored — quality scalars persist, traces ride the job.{OFF}")
+    if on_screen:
+        # The terminal owns the capture in this mode. Posting one here would
+        # hijack the session out from under the screen.
+        print(f"   {BOLD}Do the capture on the kiosk screen now.{OFF}")
+        print("   Sit in front of it, or press “Use demo capture” to submit a")
+        print("   synthetic signal if the lighting won't cooperate.")
+        print(f"   {DIM}Waiting for the terminal to submit…{OFF}")
+    else:
+        call("POST", f"/kiosk/sessions/{sid}/capture", {
+            "signal_quality_index": 0.91, "illumination_score": 0.88,
+            "face_bbox_ratio": 0.34, "frame_count": 450, "error_flags": [],
+            "rppg_signal": synth_signal(),
+        }, kiosk_auth)
+        print("   captured → queued for the worker")
+        print(f"   {DIM}No frames are stored — quality scalars persist, traces ride the job.{OFF}")
 
     step(5, "The worker runs the pipeline, seals the result, mints a one-time OTP")
-    for _ in range(45):
+    for _ in range(150 if on_screen else 45):
         st = call("GET", f"/kiosk/sessions/{sid}", None, kiosk_auth)
         if st["result_ready"] or st["status"] in ("COMPLETE", "ABORTED"):
             break

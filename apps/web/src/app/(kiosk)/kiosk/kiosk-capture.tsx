@@ -171,6 +171,44 @@ export function KioskCapture({
     [onComplete, setPhaseBoth, stop],
   );
 
+  // Demo-only (NEXT_PUBLIC_ENABLE_DEMO_CAPTURE=1): submit a clean synthetic
+  // ROI-mean RGB trace instead of driving the camera — a green-dominant
+  // pulsatile AC on a skin-tone DC plus a slow respiratory drift, so the
+  // CHROM/POS pipeline recovers a high-SNR result. Mirrors the same escape
+  // hatch in the participant TOI wizard. This is NOT a real measurement, and
+  // the button never renders unless the flag is set at build time.
+  const submitDemoCapture = useCallback((): void => {
+    stop();
+    setPhaseBoth('done');
+    const fps = TOI_CAPTURE.TARGET_FPS;
+    const seconds = TARGET_DURATION_S;
+    const n = Math.round(fps * seconds);
+    const hrHz = 72 / 60;
+    const rrHz = 15 / 60;
+    const frames = Array.from({ length: n }, (_, i) => {
+      const t = i / fps;
+      const pulse = Math.sin(2 * Math.PI * hrHz * t);
+      const resp = Math.sin(2 * Math.PI * rrHz * t);
+      const jit = 0.03 * Math.sin(2 * Math.PI * 7.3 * t + 1.1);
+      return {
+        t_ms: Math.round((i * 1000) / fps),
+        r: 180 + 0.4 * pulse + 0.8 * resp + jit,
+        g: 120 + 2.2 * pulse + 0.5 * resp + jit, // green channel strongest
+        b: 110 + 0.9 * pulse + 0.4 * resp + jit,
+      };
+    });
+    onComplete({
+      signal_quality_index: 0.95,
+      illumination_score: 0.95,
+      face_bbox_ratio: 0.35,
+      frame_count: frames.length,
+      error_flags: [],
+      rppg_signal: { frames, sample_rate_hz: fps, duration_s: seconds },
+    });
+  }, [onComplete, setPhaseBoth, stop]);
+
+  const demoEnabled = process.env.NEXT_PUBLIC_ENABLE_DEMO_CAPTURE === '1';
+
   const tick = useCallback((): void => {
     const video = videoRef.current;
     const hidden = hiddenRef.current;
@@ -368,6 +406,20 @@ export function KioskCapture({
           >
             Try again
           </button>
+        </div>
+      ) : null}
+
+      {demoEnabled && phase !== 'done' ? (
+        <div className="mx-auto mt-6 text-center">
+          <button
+            onClick={submitDemoCapture}
+            className="rounded-full border border-white/30 px-5 py-2 text-sm font-medium text-brand-100 transition-colors hover:bg-white/10"
+          >
+            Use demo capture
+          </button>
+          <p className="mt-2 text-xs text-brand-300">
+            Demo build — submits a simulated signal. Not a real measurement.
+          </p>
         </div>
       ) : null}
     </div>
