@@ -15,6 +15,13 @@ FROM base AS build
 # must be the PUBLIC https://api.<domain> — not the internal service address.
 ARG NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+# Demo-only escape hatch for the rPPG capture steps (participant wizard + kiosk):
+# submits a synthetic signal instead of driving the camera. NEXT_PUBLIC_* values
+# are inlined by `next build`, so this MUST be declared as an ARG here — a
+# build arg that isn't declared in the Dockerfile is silently discarded, which
+# leaves the flag undefined at runtime and the button permanently hidden.
+ARG NEXT_PUBLIC_ENABLE_DEMO_CAPTURE=0
+ENV NEXT_PUBLIC_ENABLE_DEMO_CAPTURE=$NEXT_PUBLIC_ENABLE_DEMO_CAPTURE
 # The web app validates runtime env at build unless told to skip; server-only
 # secrets (AUTH_SECRET, INTERNAL_SERVICE_TOKEN) are injected at run time.
 ENV SKIP_ENV_VALIDATION=1
