@@ -59,3 +59,11 @@ def test_toi_rise_nudges_site_clinicians(client: Any) -> None:
     assert unread_count(client, other_site["headers"]) == 0
     # The participant never receives the clinician nudge.
     assert unread_count(client, participant["headers"]) == 0
+
+    # And the inbox must actually RENDER. Counting unread hits COUNT(*) and never
+    # deserialises a row, so it cannot catch a notification type that is missing
+    # from the response enum — which 500s the whole list endpoint.
+    listed = client.get("/notifications/me?limit=20", headers=same_site["headers"])
+    assert listed.status_code == 200, listed.text
+    types = [n["type"] for n in listed.json()["notifications"]]
+    assert "RISK_TRAJECTORY_RISE" in types

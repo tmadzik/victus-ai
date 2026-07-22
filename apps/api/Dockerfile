@@ -20,12 +20,26 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && pip install -r requirements-cpanel.txt
 
+# Optional: the trained DANN-EDL checkpoint instead of the rule-based backend.
+# Off by default (torch is a large dependency). Build with --build-arg
+# WITH_TORCH=1 and set VICTUS_TRIAGE_MODEL_PATH to enable it — the demo stack
+# does exactly that, because the rule-based fallback is so uncertain that it can
+# never call a risk trend significant.
+# NOTE: the CPU wheel index is essential. Plain `pip install torch` resolves the
+# CUDA build and drags in several GB of nvidia-* wheels, which blows up the
+# image (and the build). Inference here is CPU-only.
+ARG WITH_TORCH=0
+RUN if [ "$WITH_TORCH" = "1" ]; then \
+      pip install --index-url https://download.pytorch.org/whl/cpu torch; \
+    fi
+
 # The application package + migrations. Installed with --no-deps so the torch
-# `ml` extra in pyproject is never pulled in.
+# `ml` extra in pyproject is never pulled in implicitly.
 COPY pyproject.toml README.md* ./
 COPY src ./src
 COPY alembic ./alembic
 COPY alembic.ini ./
+COPY models ./models
 COPY docker-entrypoint.sh ./
 RUN pip install --no-deps . \
     && chmod +x docker-entrypoint.sh
