@@ -11,9 +11,18 @@ from pydantic import BaseModel, ConfigDict
 
 
 class NotificationType(str, enum.Enum):
+    """Must stay in lock-step with ``db.models.NotificationType``.
+
+    A member missing here fails ``NotificationResponse`` validation on read,
+    which takes down the caller's whole inbox — not just the one row. A test
+    asserts the two enums match member-for-member.
+    """
+
     ERASURE_APPROVAL_REQUESTED = "ERASURE_APPROVAL_REQUESTED"
     ERASURE_REQUEST_APPROVED = "ERASURE_REQUEST_APPROVED"
     ERASURE_REQUEST_REJECTED = "ERASURE_REQUEST_REJECTED"
+    REFERRAL_RAISED = "REFERRAL_RAISED"
+    RISK_TRAJECTORY_RISE = "RISK_TRAJECTORY_RISE"
     GENERIC = "GENERIC"
 
 

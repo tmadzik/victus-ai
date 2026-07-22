@@ -1,0 +1,52 @@
+# Localhost demo overlay — layered on top of docker-compose.prod.yml.
+#
+# Differences from production: no Caddy/TLS (browsers treat http://localhost as a
+# secure context, so the rPPG camera capture still works), and each service is
+# published directly on a local port.
+#
+#   http://localhost:3001  marketing site
+#   http://localhost:3000  clinical web app
+#   http://localhost:8000  API
+#
+# Use ./infra/demo-up.sh rather than invoking compose by hand.
+name: victus-ai-demo
+
+services:
+  postgres:
+    # Published on 5433 so it cannot collide with a local Postgres on 5432.
+    ports:
+      - "127.0.0.1:5433:5432"
+
+  api:
+    # The demo runs the TRAINED model. The torch-free rule-based fallback carries
+    # ~0.5 vacuity, so its noise floor swallows even a large real move and no
+    # risk trend can ever be called significant — which would hide the
+    # trajectory and rising-risk features during a demo.
+    build:
+      args:
+        WITH_TORCH: "1"
+    environment:
+      VICTUS_TRIAGE_MODEL_PATH: /app/models/triage_edl_multihead_v1.pt
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  web:
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  marketing:
+    ports:
+      - "127.0.0.1:3001:3000"
+
+  # No TLS termination needed on localhost — park Caddy behind a profile that is
+  # never requested so `up` does not start it.
+  caddy:
+    profiles: ["never"]
+
+volumes:
+  postgres_data:
+    name: victus_demo_postgres_data
+  caddy_data:
+    name: victus_demo_caddy_data
+  caddy_config:
+    name: victus_demo_caddy_config
