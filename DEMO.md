@@ -12,7 +12,20 @@ with a synthetic cohort so every feature has something real to show.
 | --- | --- |
 | Marketing site | http://localhost:3001 |
 | Clinical app | http://localhost:3000 |
+| **Kiosk terminal** | http://localhost:3000/kiosk |
 | API docs (Swagger) | http://localhost:8000/docs |
+
+**Two extra demo affordances are switched on locally** (never in production):
+
+- **TOI demo capture** — the rPPG wizard can submit a *synthetic* capture instead
+  of driving the webcam. Meeting-room lighting and a missed face-lock are the
+  fastest way to sink a live demo; this removes that risk. The real camera path
+  still works if you want it (`localhost` is a secure context, so the browser
+  grants camera access).
+- **Gateway without Meta** — the API skips webhook signature checks when no app
+  secret is set, and the worker prints outbound WhatsApp messages to its log
+  instead of sending them. So the whole walk-up journey runs with no Meta
+  account. See the Gateway section below.
 
 **Sign in** — password for every demo account is `VictusDemo!2026`
 
@@ -94,6 +107,44 @@ facility we own, and the curve bent. That's the outcome we get paid for."*
   whole member base affordable."*
 - **Live demo (optional, strong):** as the *participant*, run a real rPPG capture
   in the browser. Camera works because `localhost` counts as a secure context.
+
+### 6b. The Mobile Clinic Gateway — the walk-up rail (4 min) ⭐
+
+This is the strongest sequence in the demo: a stranger with no account, no app
+and no appointment gets a screened, encrypted result on their own phone.
+
+Open the terminal screen on a second tab — **http://localhost:3000/kiosk** —
+then in a terminal window run:
+
+```bash
+python3 infra/demo-gateway.py
+```
+
+It walks the real journey and narrates each step:
+
+1. **Terminal opens a session** → a QR code carrying a single-use code.
+2. **They scan it** → WhatsApp opens pre-filled; sending it binds their phone to
+   that terminal. *"No app install. No account. Their existing WhatsApp."*
+3. **Consent is taken in the chat**, not on the kiosk — so the record of consent
+   lives with the participant, in their language.
+4. **Capture** → *"Only derived signals leave the terminal. No frames are ever
+   stored."*
+5. **The worker** runs the rPPG pipeline, seals the result (AES-256-GCM) and
+   mints a **one-time 4-digit code**.
+6. It prints **the two WhatsApp messages** the participant would receive: a
+   secure portal link and the code.
+
+**Open the printed link, enter the code.** They see their vitals. Then make the
+security point: the link is **single-use** (reload it — "already viewed"),
+expires in 24h, and locks out after 5 wrong codes.
+
+Finally: sign in as the **clinician** and search the participant — the clinical
+record arrived independently of the participant's copy.
+
+> Everything above is the production code path. The only stand-in is Meta: the
+> API skips webhook signature checks when no app secret is configured, and the
+> worker prints the messages rather than sending them. Say that out loud — it's
+> a stronger position than pretending.
 
 ### 7. Urgent referral — **Adaeze Okonkwo** (30 s)
 RED with a **safety override**. *"A red-flag symptom bypasses the model

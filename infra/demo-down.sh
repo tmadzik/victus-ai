@@ -6,7 +6,8 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-COMPOSE=(docker compose -f infra/docker-compose.prod.yml -f infra/docker-compose.local.yml --env-file infra/.env.local)
+COMPOSE=(docker compose -f infra/docker-compose.prod.yml -f infra/docker-compose.local.yml
+         --env-file infra/.env.local --profile whatsapp)
 
 if [ "${1:-}" = "--wipe" ]; then
   echo "Stopping and deleting the demo database volume..."

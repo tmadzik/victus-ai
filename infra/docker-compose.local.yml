@@ -27,16 +27,40 @@ services:
         WITH_TORCH: "1"
     environment:
       VICTUS_TRIAGE_MODEL_PATH: /app/models/triage_edl_multihead_v1.pt
+      # Gateway terminal auth (kioskId:token) + the number the QR deep-links to.
+      KIOSK_DEVICE_TOKENS: demo-kiosk-1:demo-kiosk-token
+      KIOSK_WHATSAPP_NUMBER: "263771234567"
     ports:
       - "127.0.0.1:8000:8000"
 
   web:
+    build:
+      args:
+        # Lets the TOI wizard submit a synthetic capture instead of driving the
+        # webcam — essential in a meeting room, where poor light or a missed face
+        # lock would otherwise sink the demo. Never enable outside a demo.
+        NEXT_PUBLIC_ENABLE_DEMO_CAPTURE: "1"
+    environment:
+      NEXT_PUBLIC_ENABLE_DEMO_CAPTURE: "1"
+      # Provisions this instance as a Mobile Clinic Gateway terminal, which
+      # unlocks the /kiosk screen. Must match KIOSK_DEVICE_TOKENS on the API.
+      KIOSK_ID: demo-kiosk-1
+      KIOSK_DEVICE_TOKEN: demo-kiosk-token
     ports:
       - "127.0.0.1:3000:3000"
 
   marketing:
     ports:
       - "127.0.0.1:3001:3000"
+
+  # Mobile Clinic Gateway + WhatsApp worker. Runs with --local-media, which
+  # swaps in the stdout replier: the messages that would go to a participant's
+  # WhatsApp (secure portal link, then the OTP) are printed to this container's
+  # log instead. No Meta credentials required.
+  worker:
+    command: ["python", "-m", "victus_api.worker", "--loop", "--local-media"]
+    environment:
+      WEB_APP_BASE_URL: ${PUBLIC_APP_URL}
 
   # No TLS termination needed on localhost — park Caddy behind a profile that is
   # never requested so `up` does not start it.
