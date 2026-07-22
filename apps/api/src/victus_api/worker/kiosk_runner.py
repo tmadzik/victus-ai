@@ -36,11 +36,20 @@ from victus_api.worker.reply import Replier
 
 log = get_logger(__name__)
 
-# Participant-facing vitals (biomarker key → label) surfaced on the portal.
-_VITAL_LABELS: dict[str, str] = {
-    "heart_rate": "Heart rate",
-    "respiratory_rate": "Breathing rate",
-    "stress_index": "Stress index",
+# Participant-facing vitals surfaced on the portal: biomarker key → (label,
+# validated). Only the camera-derived signals the pipeline actually computes
+# appear here — there is no cuffless blood pressure and no cardiovascular-risk
+# score in Pathway B, so neither can be shown.
+#
+# The unvalidated ones are labelled as such on screen and only reach the payload
+# at all when TOI_EXPOSE_EXPERIMENTAL_BIOMARKERS=1 (research/demo builds); the
+# default gate strips them upstream in the TOI service.
+_VITAL_LABELS: dict[str, tuple[str, bool]] = {
+    "heart_rate": ("Heart rate", True),
+    "respiratory_rate": ("Breathing rate", True),
+    "hrv_rmssd": ("Heart-rate variability", False),
+    "hrv_sdnn": ("HRV (SDNN)", False),
+    "stress_index": ("Stress index", False),
 }
 
 _QUALITY_NOTE: dict[str, str] = {
@@ -65,11 +74,20 @@ def _otp_message(otp: str) -> str:
 def build_result_payload(toi: ToiAssessmentResponse) -> KioskResultPayload:
     """Compose the non-diagnostic summary sealed for the secure portal."""
     vitals: dict[str, object] = {}
-    for key, label in _VITAL_LABELS.items():
+    for key, (label, validated) in _VITAL_LABELS.items():
         bm = toi.biomarkers.get(key)
         if bm is not None and bm.value is not None:
             unit = (bm.unit or "").strip()
-            vitals[label] = f"{round(bm.value, 1)} {unit}".strip()
+            # Never let an unvalidated estimate read like a measurement.
+            shown = label if validated else f"{label} (experimental)"
+            vitals[shown] = f"{round(bm.value, 1)} {unit}".strip()
+
+    # Provenance: which chrominance method won on SNR for this capture. This is
+    # the part that is tuned for Fitzpatrick III–VI, so it is worth surfacing.
+    method = (toi.signal_quality.method_selected or "").upper()
+    if method in ("CHROM", "POS"):
+        vitals["Method"] = f"{method} (auto-selected)"
+
     note = _QUALITY_NOTE.get(toi.quality.value, "")
     body = (
         f"{note} Please share these readings with a health worker. This is a "

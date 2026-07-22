@@ -30,6 +30,11 @@ services:
       # Gateway terminal auth (kioskId:token) + the number the QR deep-links to.
       KIOSK_DEVICE_TOKENS: demo-kiosk-1:demo-kiosk-token
       KIOSK_WHATSAPP_NUMBER: "263771234567"
+      # Surface HRV + stress index, which the pipeline computes but withholds by
+      # default because they are not validated against a clinical reference.
+      # They render labelled "(experimental)". DEMO ONLY — leave this off in
+      # production, where an unvalidated number must not look like a measurement.
+      TOI_EXPOSE_EXPERIMENTAL_BIOMARKERS: "1"
     ports:
       - "127.0.0.1:8000:8000"
 
@@ -61,6 +66,7 @@ services:
     command: ["python", "-m", "victus_api.worker", "--loop", "--local-media"]
     environment:
       WEB_APP_BASE_URL: ${PUBLIC_APP_URL}
+      TOI_EXPOSE_EXPERIMENTAL_BIOMARKERS: "1"
 
   # No TLS termination needed on localhost — park Caddy behind a profile that is
   # never requested so `up` does not start it.
