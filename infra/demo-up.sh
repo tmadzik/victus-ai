@@ -10,7 +10,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 ENV_FILE="infra/.env.local"
-COMPOSE=(docker compose -f infra/docker-compose.prod.yml -f infra/docker-compose.local.yml --env-file "$ENV_FILE")
+COMPOSE=(docker compose -f infra/docker-compose.prod.yml -f infra/docker-compose.local.yml
+         --env-file "$ENV_FILE" --profile whatsapp)
 
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 
