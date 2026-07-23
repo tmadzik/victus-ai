@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import re
 import subprocess
 import sys
@@ -34,7 +35,14 @@ API = "http://localhost:8000"
 APP = "http://localhost:3000"
 KIOSK_ID = "demo-kiosk-1"
 KIOSK_TOKEN = "demo-kiosk-token"
-PHONE = "263771234567"          # the participant's "phone"
+
+# A FRESH participant phone per run. The WhatsApp rail keeps one conversation
+# per phone number, so reusing a fixed number means the previous run's state
+# (still bound to that run's kiosk session, mid-consent) hijacks the next one —
+# the new nonce links, but the "YES" consents the OLD session and the terminal
+# never advances. A real walk-up is a different phone every time; this mirrors
+# that and makes the demo re-runnable. Override with DEMO_PHONE to replay one.
+PHONE = os.environ.get("DEMO_PHONE") or f"26377{int(time.time()) % 10_000_000:07d}"
 
 BOLD, DIM, GREEN, OFF = "\033[1m", "\033[2m", "\033[32m", "\033[0m"
 COMPOSE = ["docker", "compose",
