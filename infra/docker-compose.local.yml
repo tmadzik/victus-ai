@@ -53,6 +53,8 @@ services:
         # webcam — essential in a meeting room, where poor light or a missed face
         # lock would otherwise sink the demo. Never enable outside a demo.
         NEXT_PUBLIC_ENABLE_DEMO_CAPTURE: "1"
+        # No TLS locally, so HSTS would pin localhost to https and break every page.
+        VICTUS_DISABLE_HSTS: "1"
     environment:
       NEXT_PUBLIC_ENABLE_DEMO_CAPTURE: "1"
       # Provisions this instance as a Mobile Clinic Gateway terminal, which
@@ -63,6 +65,9 @@ services:
       - "3000:3000"
 
   marketing:
+    build:
+      args:
+        VICTUS_DISABLE_HSTS: "1"
     ports:
       - "3001:3000"
 

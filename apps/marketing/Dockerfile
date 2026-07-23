@@ -13,6 +13,10 @@ FROM base AS build
 ARG NEXT_PUBLIC_APP_URL
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 ENV SKIP_ENV_VALIDATION=1
+# Omit the HSTS header in local/demo builds — over plain HTTP it pins the
+# whole localhost host to https and every page then fails to connect.
+ARG VICTUS_DISABLE_HSTS=0
+ENV VICTUS_DISABLE_HSTS=$VICTUS_DISABLE_HSTS
 COPY . .
 RUN pnpm install --frozen-lockfile \
     && pnpm --filter @victus/marketing build

@@ -25,6 +25,10 @@ ENV NEXT_PUBLIC_ENABLE_DEMO_CAPTURE=$NEXT_PUBLIC_ENABLE_DEMO_CAPTURE
 # The web app validates runtime env at build unless told to skip; server-only
 # secrets (AUTH_SECRET, INTERNAL_SERVICE_TOKEN) are injected at run time.
 ENV SKIP_ENV_VALIDATION=1
+# Omit the HSTS header in local/demo builds — over plain HTTP it pins the
+# whole localhost host to https and every page then fails to connect.
+ARG VICTUS_DISABLE_HSTS=0
+ENV VICTUS_DISABLE_HSTS=$VICTUS_DISABLE_HSTS
 COPY . .
 RUN pnpm install --frozen-lockfile \
     && pnpm --filter @victus/web build
