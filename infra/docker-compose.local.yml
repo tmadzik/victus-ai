@@ -4,6 +4,13 @@
 # secure context, so the rPPG camera capture still works), and each service is
 # published directly on a local port.
 #
+# NOTE ON PORT BINDINGS: the three browser-facing services publish WITHOUT a
+# 127.0.0.1 prefix. macOS resolves "localhost" to ::1 (IPv6) before 127.0.0.1,
+# and a loopback-only bind is IPv4-only — so browsers that try IPv6 first get
+# connection-refused and the site looks down even though the container is
+# healthy. Publishing on all interfaces answers on both stacks (and lets you
+# open the kiosk from a phone on the same network). Postgres stays loopback-only.
+#
 #   http://localhost:3001  marketing site
 #   http://localhost:3000  clinical web app
 #   http://localhost:8000  API
@@ -14,6 +21,7 @@ name: victus-ai-demo
 services:
   postgres:
     # Published on 5433 so it cannot collide with a local Postgres on 5432.
+    # Kept loopback-only: nothing outside this machine should reach the database.
     ports:
       - "127.0.0.1:5433:5432"
 
@@ -36,7 +44,7 @@ services:
       # production, where an unvalidated number must not look like a measurement.
       TOI_EXPOSE_EXPERIMENTAL_BIOMARKERS: "1"
     ports:
-      - "127.0.0.1:8000:8000"
+      - "8000:8000"
 
   web:
     build:
@@ -52,11 +60,11 @@ services:
       KIOSK_ID: demo-kiosk-1
       KIOSK_DEVICE_TOKEN: demo-kiosk-token
     ports:
-      - "127.0.0.1:3000:3000"
+      - "3000:3000"
 
   marketing:
     ports:
-      - "127.0.0.1:3001:3000"
+      - "3001:3000"
 
   # Mobile Clinic Gateway + WhatsApp worker. Runs with --local-media, which
   # swaps in the stdout replier: the messages that would go to a participant's
