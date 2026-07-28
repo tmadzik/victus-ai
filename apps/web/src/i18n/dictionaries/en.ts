@@ -41,8 +41,9 @@ export const en = {
     pathwayB: {
       title: 'Pathway B — TOI',
       description:
-        'Camera-based rPPG biomarkers (HR, RR, BP, HRV, Stress, CVD risk) ' +
-        'optimized for Fitzpatrick III–VI via CHROM / POS.',
+        'Camera-based rPPG biomarkers (heart rate, respiratory rate; HRV and ' +
+        'a stress proxy, experimental) optimised for Fitzpatrick III–VI via ' +
+        'CHROM / POS.',
     },
   },
   // Pathway A wizard chrome. Clinical content (symptom descriptions, risk-class
