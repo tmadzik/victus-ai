@@ -45,7 +45,8 @@ export default async function HomePage(): Promise<React.ReactElement> {
             <CardTitle>TOI Biomarkers</CardTitle>
             <CardDescription>
               Camera-based rPPG with CHROM / POS chrominance pipelines tuned for
-              Fitzpatrick III–VI skin types. HR, RR, BP, HRV, stress and CVD risk.
+              Fitzpatrick III–VI skin types. Heart rate and respiratory rate,
+              plus HRV and a stress proxy (experimental).
             </CardDescription>
           </CardHeader>
         </Card>
