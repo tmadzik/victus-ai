@@ -61,6 +61,12 @@ services:
       # unlocks the /kiosk screen. Must match KIOSK_DEVICE_TOKENS on the API.
       KIOSK_ID: demo-kiosk-1
       KIOSK_DEVICE_TOKEN: demo-kiosk-token
+      # Unset the base compose's hardcoded AUTH_URL (a null value here resolves
+      # from the host env, which has none, so it is not passed to the container).
+      # With AUTH_TRUST_HOST=true the app then derives its origin from the actual
+      # request, so login works on localhost, 127.0.0.1, and the LAN IP — not
+      # only the one baked-in host.
+      AUTH_URL:
     ports:
       - "3000:3000"
 
