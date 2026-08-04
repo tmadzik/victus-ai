@@ -8,12 +8,12 @@ export function Efficacy(): ReactElement {
           Stop the 90 Million.
         </h2>
         <p className="text-lg leading-relaxed text-pretty text-white/80">
-          NCDs will claim 90 million avoidable lives this decade. Stop waiting for lagging claims
-          data. Act on predictive, high-fidelity biometric signals today.
+          NCDs will claim 90 million avoidable lives this decade. The opportunity is to act on
+          predictive signals earlier — instead of waiting for lagging claims data.
         </p>
         <p className="text-sm text-pretty text-white/60">
-          Calibrated for African populations and Fitzpatrick III–VI skin types to isolate
-          cardiovascular and metabolic risk.
+          Calibrated for African populations and Fitzpatrick III–VI skin types, and validated
+          pathway by pathway before any clinical claim.
         </p>
         <p className="text-xs text-white/40">
           Source: NCD Alliance projection of avoidable NCD deaths, 2020–2030.
