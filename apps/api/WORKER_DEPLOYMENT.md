@@ -54,11 +54,17 @@ these in the cron environment, the systemd unit, or an env file you `source`.
 
 | Variable | Value |
 | --- | --- |
+| `WHATSAPP_SEND_ENABLED` | **master switch — `false` by default.** While `false`, the worker never calls Meta (logs `whatsapp_rail_disabled` and uses safe no-network fakes: replies print to stdout, media downloads refuse). Set `true` only once Meta business verification is complete **and** the token/phone id below are set. |
 | `WHATSAPP_ACCESS_TOKEN` | Meta permanent token (download + send) |
 | `WHATSAPP_PHONE_NUMBER_ID` | the sending number's id |
 | `WHATSAPP_API_VERSION` | optional, defaults to `v21.0` |
+| `WHATSAPP_GRAPH_BASE_URL` | optional, defaults to `https://graph.facebook.com` |
 
-(The webhook side additionally needs `WHATSAPP_VERIFY_TOKEN` + `WHATSAPP_APP_SECRET`; set all four everywhere for simplicity.)
+> The rail is **off until you flip `WHATSAPP_SEND_ENABLED=true`**. If it is `true`
+> but the token or phone id is missing, the worker logs `whatsapp_rail_misconfigured`
+> and stays in the safe no-network mode rather than crashing.
+
+(The webhook side additionally needs `WHATSAPP_VERIFY_TOKEN` + `WHATSAPP_APP_SECRET`; set all everywhere for simplicity.)
 
 **Worker tuning (all optional — sensible defaults shown):**
 
@@ -168,7 +174,11 @@ Postgres.
 - **Jobs reach FAILED after retries** — check the worker log for
   `capture_extract_failed` / `capture_pipeline_failed`; usually a bad download
   (wrong `WHATSAPP_ACCESS_TOKEN`) or an unreadable video.
-- **No reply sent** — `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` missing
-  or wrong; the vitals still persist, only the outbound message fails.
+- **No reply sent / `whatsapp_rail_disabled` in the log** — `WHATSAPP_SEND_ENABLED`
+  is not `true`, so the worker is intentionally not calling Meta. Set it to `true`
+  (with the token + phone id) once verification is done.
+- **`whatsapp_rail_misconfigured`** — `WHATSAPP_SEND_ENABLED=true` but
+  `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` is missing; set both. The
+  vitals still persist, only the outbound message fails.
 - **Worker won't boot in production** — a placeholder `JWT_SECRET_KEY` /
   `INTERNAL_SERVICE_TOKEN` / `PSEUDO_SALT`; set the real values (same as the API).
