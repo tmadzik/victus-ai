@@ -6,10 +6,11 @@ cPanel cron (every minute):
 cPanel "Setup Python App" (persistent):
     python -m victus_api.worker --loop
 
-Both default to the WhatsApp Cloud fetcher/replier (stubbed until Meta
-verification). For local end-to-end testing without WhatsApp, pass
-``--local-media`` to treat ``media_id`` as a local file path and print replies
-to stdout instead of sending them.
+The WhatsApp Cloud rail is off by default. Set ``WHATSAPP_SEND_ENABLED=true``
+(with ``WHATSAPP_ACCESS_TOKEN`` and ``WHATSAPP_PHONE_NUMBER_ID``) to send/receive
+via Meta once business verification lands; until then the worker logs a warning
+and never calls Meta. For local end-to-end testing, pass ``--local-media`` to
+treat ``media_id`` as a local file path and print replies to stdout.
 """
 
 from __future__ import annotations
@@ -20,7 +21,11 @@ import asyncio
 from victus_api.core.logging import get_logger
 from victus_api.worker.config import WorkerConfig
 from victus_api.worker.kiosk_runner import run_kiosk_loop, run_kiosk_once
-from victus_api.worker.media import LocalFileMediaFetcher, WhatsAppCloudMediaFetcher
+from victus_api.worker.media import (
+    LocalFileMediaFetcher,
+    MediaFetcher,
+    WhatsAppCloudMediaFetcher,
+)
 from victus_api.worker.reply import Replier, WhatsAppCloudReplier
 from victus_api.worker.runner import run_loop, run_once
 
@@ -34,16 +39,49 @@ class _StdoutReplier:
         print(f"\n--- reply to {to} ---\n{text}\n")
 
 
-def _build_io(args: argparse.Namespace):  # noqa: ANN202 - simple CLI helper
-    import os
+class _DisabledMediaFetcher:
+    """Used when the WhatsApp rail is off: any attempt to download real Cloud
+    media fails loudly (and the job is retried/failed) rather than silently
+    doing nothing. There should be no WhatsApp media jobs while the rail is off,
+    so this is a safety net, not an expected path."""
 
+    async def fetch(self, *, media_id: str, dest_dir: str) -> str:
+        raise RuntimeError(
+            "WhatsApp rail is disabled (set WHATSAPP_SEND_ENABLED=true with "
+            "credentials to enable Cloud API downloads)."
+        )
+
+
+def _build_io(
+    args: argparse.Namespace, cfg: WorkerConfig
+) -> tuple[MediaFetcher, Replier]:
     if args.local_media:
         return LocalFileMediaFetcher(), _StdoutReplier()
-    token = os.environ.get("WHATSAPP_ACCESS_TOKEN", "")
-    phone_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
-    fetcher = WhatsAppCloudMediaFetcher(access_token=token)
+    if not cfg.whatsapp_enabled:
+        log.warning(
+            "whatsapp_rail_disabled",
+            reason="WHATSAPP_SEND_ENABLED not set; no messages will reach Meta",
+        )
+        return _DisabledMediaFetcher(), _StdoutReplier()
+    if not (cfg.whatsapp_access_token and cfg.whatsapp_phone_number_id):
+        log.error(
+            "whatsapp_rail_misconfigured",
+            reason="WHATSAPP_SEND_ENABLED is on but token/phone_number_id missing",
+        )
+        return _DisabledMediaFetcher(), _StdoutReplier()
+    log.info("whatsapp_rail_enabled", api_version=cfg.whatsapp_api_version)
+    fetcher = WhatsAppCloudMediaFetcher(
+        access_token=cfg.whatsapp_access_token,
+        api_version=cfg.whatsapp_api_version,
+        base_url=cfg.whatsapp_graph_base_url,
+        timeout_s=cfg.http_timeout_s,
+    )
     replier: Replier = WhatsAppCloudReplier(
-        access_token=token, phone_number_id=phone_id
+        access_token=cfg.whatsapp_access_token,
+        phone_number_id=cfg.whatsapp_phone_number_id,
+        api_version=cfg.whatsapp_api_version,
+        base_url=cfg.whatsapp_graph_base_url,
+        timeout_s=cfg.http_timeout_s,
     )
     return fetcher, replier
 
@@ -61,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     cfg = WorkerConfig.from_env()
-    fetcher, replier = _build_io(args)
+    fetcher, replier = _build_io(args, cfg)
 
     if args.once:
 

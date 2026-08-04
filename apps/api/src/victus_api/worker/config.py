@@ -23,6 +23,17 @@ class WorkerConfig:
     media_dir: str = "var/whatsapp-media"
     purge_media_on_done: bool = True  # data-minimisation: delete raw video
 
+    # --- WhatsApp Cloud rail (off until Meta business verification) ----------
+    # The single master switch. While false the worker never constructs the live
+    # Cloud clients, so no request reaches Meta; flip to true (with credentials)
+    # the moment verification lands.
+    whatsapp_enabled: bool = False
+    whatsapp_access_token: str = ""
+    whatsapp_phone_number_id: str = ""
+    whatsapp_api_version: str = "v21.0"
+    whatsapp_graph_base_url: str = "https://graph.facebook.com"
+    http_timeout_s: float = 30.0
+
     @classmethod
     def from_env(cls) -> WorkerConfig:
         def _int(name: str, default: int) -> int:
@@ -48,4 +59,18 @@ class WorkerConfig:
             purge_media_on_done=_bool(
                 "WORKER_PURGE_MEDIA", cls.purge_media_on_done
             ),
+            whatsapp_enabled=_bool("WHATSAPP_SEND_ENABLED", cls.whatsapp_enabled),
+            whatsapp_access_token=os.environ.get(
+                "WHATSAPP_ACCESS_TOKEN", cls.whatsapp_access_token
+            ),
+            whatsapp_phone_number_id=os.environ.get(
+                "WHATSAPP_PHONE_NUMBER_ID", cls.whatsapp_phone_number_id
+            ),
+            whatsapp_api_version=os.environ.get(
+                "WHATSAPP_API_VERSION", cls.whatsapp_api_version
+            ),
+            whatsapp_graph_base_url=os.environ.get(
+                "WHATSAPP_GRAPH_BASE_URL", cls.whatsapp_graph_base_url
+            ),
+            http_timeout_s=_float("WORKER_HTTP_TIMEOUT_S", cls.http_timeout_s),
         )
