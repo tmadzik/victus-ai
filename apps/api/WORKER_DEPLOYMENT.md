@@ -1,20 +1,31 @@
-# Deploying the WhatsApp capture worker
+# Deploying the capture worker (WhatsApp + kiosk)
 
-The WhatsApp rail has **two** runtime pieces:
+One background **worker** process drains **two** independent capture queues from
+the shared PostgreSQL database:
 
-1. The **webhook** — part of the API process (`apps/api`); it just verifies the
-   Meta signature, advances the conversation, writes a `processing_jobs` row, and
-   returns 200. Deploy it with the API ([DEPLOYMENT.md](DEPLOYMENT.md)).
-2. The **worker** (this doc) — a **separate process** that claims queued jobs,
-   downloads the video from Meta, extracts rPPG, runs the pipeline, persists the
-   `ToiAssessment`, and sends the WhatsApp reply.
+- **WhatsApp** captures — downloads the video from Meta, extracts rPPG, runs the
+  pipeline, persists the `ToiAssessment`, sends the WhatsApp reply.
+- **Kiosk** captures — the kiosk terminal already extracted the rPPG signal
+  in-browser (no video to download), so the worker runs the pipeline, persists
+  the `ToiAssessment`, seals the result, mints a one-time code, and delivers the
+  participant's secure-portal link + code over WhatsApp.
 
-They share one PostgreSQL database (the queue). The worker does the heavy lifting
-off the request path, so the webhook always answers Meta instantly.
+Both are handled by `python -m victus_api.worker` — a single `--once`/`--loop`
+run processes each queue. **Scheduling this worker is what makes the kiosk rail
+live in production**; without it, kiosk sessions sit `QUEUED` forever.
 
-> **The worker needs OpenCV.** Install the API with the `video` extra
-> (`uv sync --extra video`, or add `opencv-python-headless` to the venv). The
-> webhook/API itself does **not** need it (`cv2` is imported lazily).
+> The **webhook** (WhatsApp inbound) and the **kiosk gateway** API live in the
+> API process (`apps/api`) and are deployed with it ([DEPLOYMENT.md](DEPLOYMENT.md)).
+> This doc is only about the separate worker process. All three share one DB.
+
+### OpenCV is only for the WhatsApp video rail
+
+The WhatsApp path decodes video, so it needs OpenCV — install the API with the
+`video` extra (`uv sync --extra video`, or `pip install opencv-python-headless`).
+The **kiosk path needs no OpenCV** (the signal arrives pre-extracted) and neither
+does the API/webhook (`cv2` is imported lazily). So a **kiosk-only** deployment —
+the common case while WhatsApp verification is still pending — can skip OpenCV
+entirely and still process every kiosk capture.
 
 ---
 
@@ -81,24 +92,30 @@ these in the cron environment, the systemd unit, or an env file you `source`.
 
 ## Path A — cPanel cron (`--once`)
 
-1. Install the worker's deps into the API's virtualenv, **with OpenCV**:
+1. Install the worker's deps into the API's virtualenv. For a **kiosk-only**
+   rollout, `requirements-cpanel.txt` is enough. Add OpenCV only when you turn on
+   the WhatsApp video rail:
    ```bash
    # in the cPanel Python App virtualenv (or your venv)
-   pip install -r requirements-cpanel.txt opencv-python-headless
+   pip install -r requirements-cpanel.txt
+   # WhatsApp video rail only:  pip install opencv-python-headless
    ```
-2. Create a writable media scratch dir and set `WORKER_MEDIA_DIR` to it, e.g.
-   `~/victus-media` (`mkdir -p ~/victus-media`).
-3. cPanel → **Cron Jobs** → add a **once-per-minute** job. Put the env inline (cron
-   has a bare environment), or `source` an env file:
+2. Copy the env template and fill it in (see the tables above):
+   ```bash
+   cp apps/api/worker.env.example apps/api/worker.env   # then edit
    ```
-   * * * * * cd ~/victus-api && . ~/victus-api/worker.env && \
-     ~/virtualenv/victus-api/3.12/bin/python -m victus_api.worker --once \
-     >> ~/victus-worker.log 2>&1
+   Set `PYTHON` to the venv's interpreter (e.g.
+   `~/virtualenv/victus-api/3.12/bin/python`). For the WhatsApp rail, create a
+   writable `WORKER_MEDIA_DIR` (`mkdir -p ~/victus-media`); the kiosk rail needs
+   no scratch dir.
+3. cPanel → **Cron Jobs** → add a **once-per-minute** job pointing at the wrapper
+   (it loads `worker.env`, sets `PYTHONPATH`, and execs — no long inline command):
    ```
-   where `~/victus-api/worker.env` exports the variables from the tables above
-   (`export DATABASE_URL=...`, `export WHATSAPP_ACCESS_TOKEN=...`, etc.) and
-   `PYTHONPATH=src`.
-4. Watch `~/victus-worker.log` — each run logs `worker_run_once_complete handled=N`.
+   * * * * * /home/USER/victus/apps/api/scripts/run-worker.sh --once >> ~/victus-worker.log 2>&1
+   ```
+   (Env lives in `worker.env`; override its location with `WORKER_ENV_FILE=...`.)
+4. Watch `~/victus-worker.log` — each run logs
+   `worker_run_once_complete whatsapp=N kiosk=M`.
 
 `--once` claims a batch (`FOR UPDATE SKIP LOCKED`), processes it, and exits, so
 overlapping cron runs never double-process a job.
@@ -110,14 +127,14 @@ overlapping cron runs never double-process a job.
 ```ini
 # /etc/systemd/system/victus-worker.service
 [Unit]
-Description=Victus WhatsApp capture worker
+Description=Victus capture worker (WhatsApp + kiosk)
 After=network-online.target
 
 [Service]
-WorkingDirectory=/opt/victus/apps/api
-Environment=PYTHONPATH=/opt/victus/apps/api/src
-EnvironmentFile=/opt/victus/worker.env          # the variables above
-ExecStart=/opt/victus/.venv/bin/python -m victus_api.worker --loop
+# The wrapper resolves the app dir, loads worker.env, and sets PYTHONPATH.
+Environment=PYTHON=/opt/victus/.venv/bin/python
+Environment=WORKER_ENV_FILE=/opt/victus/worker.env
+ExecStart=/opt/victus/apps/api/scripts/run-worker.sh --loop
 Restart=always
 RestartSec=5
 User=victus
@@ -129,7 +146,9 @@ WantedBy=multi-user.target
 ```bash
 # one-time
 python3.12 -m venv /opt/victus/.venv && . /opt/victus/.venv/bin/activate
-pip install -r /opt/victus/apps/api/requirements-cpanel.txt opencv-python-headless
+pip install -r /opt/victus/apps/api/requirements-cpanel.txt
+# WhatsApp video rail only:  pip install opencv-python-headless
+cp /opt/victus/apps/api/worker.env.example /opt/victus/worker.env   # then edit
 sudo systemctl enable --now victus-worker
 sudo journalctl -u victus-worker -f         # live logs
 ```
@@ -158,8 +177,23 @@ Postgres.
 
 ## Verify in production
 
+**Kiosk rail** (works even while WhatsApp is off):
+
+1. Complete a capture at a kiosk terminal → a `processing_jobs` row appears with
+   `channel=KIOSK`, `status=QUEUED`.
+2. Within a minute (cron) / seconds (loop) the row moves to `SUCCEEDED` and the
+   run logs `kiosk_result_sent` (or `worker_run_once_complete kiosk=1`).
+3. A `toi_assessments` row is written for the participant, visible in the
+   clinician app, with a `PATHWAY_B_ASSESSMENT_COMPLETED` audit entry.
+4. **Delivery caveat:** the participant's portal link + one-time code go over
+   WhatsApp, so they only actually arrive once `WHATSAPP_SEND_ENABLED=true`. While
+   it is off, the capture is still processed and clinician-visible; the delivery
+   message is written to the worker log instead of being sent (`whatsapp_rail_disabled`).
+
+**WhatsApp rail** (needs Meta verification + `WHATSAPP_SEND_ENABLED=true`):
+
 1. Send a real WhatsApp check-up through to the video step (a `processing_jobs`
-   row appears, `status=QUEUED`).
+   row appears with `channel=WHATSAPP`, `status=QUEUED`).
 2. Within a minute (cron) / seconds (loop), the row moves to `SUCCEEDED` (or
    `REJECTED` for a poor capture) and the participant receives the reply.
 3. A `toi_assessments` row is written for the participant's anchored user, with a
