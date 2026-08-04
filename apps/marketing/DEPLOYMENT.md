@@ -2,8 +2,14 @@
 
 The marketing site ships as a **self-contained Node.js bundle** (Next.js
 standalone output, production `node_modules` included). The cPanel host never
-runs `npm install` — you build locally, upload one zip, and point Passenger at
-it.
+runs `npm install` — you build locally, upload one archive, and point Passenger
+at it.
+
+> The bundle ships as **`.tar.gz`**, not `.zip`: cPanel's virus scanner
+> (ClamAV + the Sanesecurity "Foxhole" ruleset) false-positives on any `.zip`
+> containing JavaScript (`Foxhole.JS_Zip_*`), which a Node bundle always
+> contains. `.tar.gz` sidesteps it and cPanel's File Manager extracts it the
+> same way.
 
 > **Host requirements:** cPanel with **"Setup Node.js App"** (CloudLinux
 > Node.js Selector / Passenger) and **Node.js 20 or newer**. The pilot-request
@@ -59,7 +65,7 @@ NEXT_PUBLIC_APP_URL=https://app.victusdata.com \
   pnpm --filter @victus/marketing build:cpanel
 ```
 
-Output: `apps/marketing/dist-cpanel/victus-marketing-cpanel.zip`
+Output: `apps/marketing/dist-cpanel/victus-marketing-cpanel.tar.gz`
 
 The same bundle also runs locally for a final smoke test:
 
@@ -74,7 +80,7 @@ PORT=3001 node apps/marketing/.next/standalone/app.js
 > cPanel. Building on Node 20 keeps the build major aligned with the host.
 
 > **Optional CI fallback.** A dormant `.github/workflows/release-marketing.yml`
-> can build the same zip on Linux (on a published Release, or via **Actions →
+> can build the same archive on Linux (on a published Release, or via **Actions →
 > Run workflow**) if you ever want to build off-machine. It is not required for
 > this deploy flow.
 
@@ -94,9 +100,9 @@ PORT=3001 node apps/marketing/.next/standalone/app.js
 
 1. cPanel → **File Manager** → navigate to the application root
    (`~/victus-marketing`).
-2. Upload `victus-marketing-cpanel.zip` and **Extract** it there. The folder
+2. Upload `victus-marketing-cpanel.tar.gz` and **Extract** it there. The folder
    should now contain `app.js`, `apps/`, and `node_modules/` at the top level.
-3. Delete the zip after extraction.
+3. Delete the archive after extraction.
 
 Do **not** run "Run NPM Install" in the Node.js app screen — dependencies are
 already bundled.
@@ -136,8 +142,9 @@ the Node.js app screen / Passenger log).
 ## Updating the site
 
 Re-run step 1, stop the app, delete the old `apps/` and `node_modules/`
-folders, extract the new zip, start the app. Environment variables persist
-across updates.
+folders **from the application root (`~/victus-marketing`), not `public_html`**,
+extract the new archive, start the app. Environment variables persist across
+updates.
 
 ## Troubleshooting
 
@@ -146,7 +153,10 @@ across updates.
 - **Form succeeds but no email arrives** — check the Passenger log for
   `[pilot-request] channel failure(s)`. Usual causes: wrong mailbox password,
   or the host requires port 587 with `SMTP_SECURE=false`.
-- **Styles load but images 404** — the zip was extracted into a subfolder;
+- **Styles load but images 404** — the archive was extracted into a subfolder;
   `app.js` must sit directly in the application root.
+- **Upload rejected as a virus (`Foxhole.JS_Zip_*`)** — you tried to upload a
+  `.zip`. Use the `.tar.gz` the build produces; the scanner false-positives on
+  any zip containing JavaScript.
 - **"Sign In" points to the wrong place** — `NEXT_PUBLIC_APP_URL` is baked in
   at build time; rebuild the bundle with the correct value.
