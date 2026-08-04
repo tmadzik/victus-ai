@@ -127,6 +127,53 @@ def _summary_block(history: ParticipantHistory, styles: dict[str, ParagraphStyle
     return table
 
 
+def _enrollment_section(
+    history: ParticipantHistory, styles: dict[str, ParagraphStyle]
+) -> list:
+    e = history.enrollment
+    flow: list = [Paragraph("Enrollment", styles["h2"])]
+    if not e.enrolled:
+        flow.append(
+            Paragraph(
+                "No front-of-platform enrollment record for this participant.",
+                styles["small"],
+            )
+        )
+        return flow
+    pid = e.patient_id_hash
+    pid_display = f"{pid[:12]}… (SHA-256)" if pid else "—"
+    consents = ", ".join(e.consents) if e.consents else "None on file"
+    rows = [
+        ["Age band", e.age_range or "—", "Biological sex", e.biological_sex or "—"],
+        ["Region", e.region or "—", "Jurisdiction", e.jurisdiction or "—"],
+        [
+            "Race / ethnicity",
+            e.race_ethnicity or "Not stated",
+            "Enrolled",
+            _fmt_dt(e.enrolled_at),
+        ],
+        ["Patient ID", pid_display, "Consents", consents],
+    ]
+    table = Table(rows, colWidths=[26 * mm, 62 * mm, 26 * mm, 56 * mm])
+    table.setStyle(
+        TableStyle(
+            [
+                ("FONT", (0, 0), (-1, -1), "Helvetica", 9),
+                ("TEXTCOLOR", (0, 0), (0, -1), _MUTED),
+                ("TEXTCOLOR", (2, 0), (2, -1), _MUTED),
+                ("TEXTCOLOR", (1, 0), (1, -1), _INK),
+                ("TEXTCOLOR", (3, 0), (3, -1), _INK),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ("LINEBELOW", (0, 0), (-1, -2), 0.4, _RULE),
+            ]
+        )
+    )
+    flow.append(table)
+    return flow
+
+
 def _triage_section(history: ParticipantHistory, styles: dict[str, ParagraphStyle]) -> list:
     flow: list = [Paragraph("Pathway A — 3B-Triage", styles["h2"])]
     if not history.triage:
@@ -271,6 +318,8 @@ def build_participant_report_pdf(
         HRFlowable(width="100%", thickness=0.6, color=_RULE),
         Spacer(1, 6),
         _summary_block(history, styles),
+        Spacer(1, 8),
+        *_enrollment_section(history, styles),
         *_triage_section(history, styles),
         *_toi_section(history, styles),
         Spacer(1, 10),

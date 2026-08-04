@@ -11,7 +11,11 @@ import uuid
 from datetime import UTC, datetime
 
 from victus_api.clinical.report import build_participant_report_pdf
-from victus_api.clinical.schemas import ParticipantHistory, ParticipantSummary
+from victus_api.clinical.schemas import (
+    EnrollmentSummary,
+    ParticipantHistory,
+    ParticipantSummary,
+)
 from victus_api.core.claims import ClaimsMode
 from victus_api.db.models import User, UserRole
 from victus_api.toi.schemas import (
@@ -52,6 +56,22 @@ def _summary(triage_n: int = 0, toi_n: int = 0) -> ParticipantSummary:
         triage_count=triage_n,
         toi_count=toi_n,
         last_activity=datetime.now(UTC),
+    )
+
+
+def _enrollment(enrolled: bool = False) -> EnrollmentSummary:
+    if not enrolled:
+        return EnrollmentSummary(enrolled=False)
+    return EnrollmentSummary(
+        enrolled=True,
+        age_range="30-39",
+        biological_sex="FEMALE",
+        region="Lagos",
+        race_ethnicity="Black African",
+        jurisdiction="NDPA",
+        patient_id_hash="a" * 64,
+        consents=["TRIAGE", "TOI_IMAGING"],
+        enrolled_at=datetime.now(UTC),
     )
 
 
@@ -119,7 +139,9 @@ def _toi() -> ToiAssessmentResponse:
 
 
 def test_build_pdf_empty_history() -> None:
-    history = ParticipantHistory(participant=_summary(), triage=[], toi=[])
+    history = ParticipantHistory(
+        participant=_summary(), enrollment=_enrollment(), triage=[], toi=[]
+    )
     pdf = build_participant_report_pdf(
         history, generated_by=_actor(), generated_at=datetime.now(UTC)
     )
@@ -130,6 +152,7 @@ def test_build_pdf_empty_history() -> None:
 def test_build_pdf_populated_history() -> None:
     history = ParticipantHistory(
         participant=_summary(triage_n=1, toi_n=1),
+        enrollment=_enrollment(enrolled=True),
         triage=[_triage()],
         toi=[_toi()],
     )

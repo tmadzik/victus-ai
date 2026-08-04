@@ -25,9 +25,30 @@ class ParticipantSummary(BaseModel):
     last_activity: datetime | None
 
 
+class EnrollmentSummary(BaseModel):
+    """The participant's enrollment record as a clinician sees it.
+
+    Identifiers captured at enrollment (age band, sex, region, self-reported
+    race/ethnicity) plus the governing jurisdiction, granted consents, and the
+    salted patient-id hash. After account erasure the direct/special-category
+    fields are ``None`` (tombstoned); the de-identified strata remain.
+    """
+
+    enrolled: bool
+    age_range: str | None = None
+    biological_sex: str | None = None
+    region: str | None = None
+    race_ethnicity: str | None = None
+    jurisdiction: str | None = None
+    patient_id_hash: str | None = None
+    consents: list[str] = []
+    enrolled_at: datetime | None = None
+
+
 class ParticipantHistory(BaseModel):
     """A participant's identified record: summary + both pathways' assessments."""
 
     participant: ParticipantSummary
+    enrollment: EnrollmentSummary
     triage: list[TriageAssessmentResponse]
     toi: list[ToiAssessmentResponse]
