@@ -15,10 +15,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from victus_api.audit.service import write_audit
 from victus_api.clinical.report import build_participant_report_pdf
-from victus_api.clinical.schemas import ParticipantHistory, ParticipantSummary
+from victus_api.clinical.schemas import (
+    EnrollmentSummary,
+    ParticipantHistory,
+    ParticipantSummary,
+)
 from victus_api.config import Settings
 from victus_api.core.exceptions import NotFoundError
-from victus_api.db.models import AuditAction, ToiAssessment, TriageAssessment, User
+from victus_api.db.models import (
+    AuditAction,
+    ConsentRecord,
+    ParticipantProfile,
+    ToiAssessment,
+    TriageAssessment,
+    User,
+)
 from victus_api.toi.service import list_assessments_for_user as list_toi
 from victus_api.triage.service import list_assessments_for_user as list_triage
 
@@ -122,7 +133,44 @@ async def _build_history(
     triage = await list_triage(db, user_id=user_id, settings=settings, limit=capped)
     toi = await list_toi(db, user_id=user_id, limit=capped)
     summary = await _summary(db, user)
-    return user, ParticipantHistory(participant=summary, triage=triage, toi=toi)
+    enrollment = await _enrollment(db, user_id)
+    return user, ParticipantHistory(
+        participant=summary, enrollment=enrollment, triage=triage, toi=toi
+    )
+
+
+async def _enrollment(db: AsyncSession, user_id: uuid.UUID) -> EnrollmentSummary:
+    """The participant's enrollment record + active consents (no PII beyond the
+    identified record the clinician is already authorised to view)."""
+    profile = (
+        await db.execute(
+            select(ParticipantProfile).where(ParticipantProfile.user_id == user_id)
+        )
+    ).scalar_one_or_none()
+    consents = sorted(
+        c.value
+        for c in (
+            await db.execute(
+                select(ConsentRecord.consent_type).where(
+                    ConsentRecord.user_id == user_id,
+                    ConsentRecord.revoked_at.is_(None),
+                )
+            )
+        ).scalars()
+    )
+    if profile is None:
+        return EnrollmentSummary(enrolled=False, consents=consents)
+    return EnrollmentSummary(
+        enrolled=True,
+        age_range=profile.age_range,
+        biological_sex=profile.biological_sex.value,
+        region=profile.region,
+        race_ethnicity=profile.race_ethnicity,
+        jurisdiction=profile.jurisdiction,
+        patient_id_hash=profile.patient_id_hash,
+        consents=consents,
+        enrolled_at=profile.enrolled_at,
+    )
 
 
 async def get_participant_history(

@@ -83,6 +83,26 @@ def _seed_participant(client: Any) -> dict[str, Any]:
     return participant
 
 
+def _enroll(client: Any, headers: dict[str, str]) -> None:
+    r = client.post(
+        "/enrollment",
+        headers=headers,
+        json={
+            "full_name": "Enrolled Participant",
+            "email": f"enrolled_{uuid.uuid4().hex[:8]}@example.com",
+            "patient_id": f"MRN-{uuid.uuid4().hex[:8]}",
+            "age_range": "40-49",
+            "biological_sex": "MALE",
+            "region": "NG",
+            "race_ethnicity": "Black African",
+            "consent_triage": True,
+            "consent_toi_imaging": True,
+            "consent_research": False,
+        },
+    )
+    assert r.status_code == 201, r.text
+
+
 def test_patient_cannot_access_clinical(client: Any) -> None:
     user = register(client, "PATIENT")
     assert client.get(
@@ -122,6 +142,40 @@ def test_clinician_searches_and_opens_history(client: Any) -> None:
 
     # Both accesses were audited.
     assert asyncio.run(_count_view_audits(clinician["id"])) >= 2
+
+
+def test_history_surfaces_enrollment(client: Any) -> None:
+    participant = register(client, "PATIENT")
+    _enroll(client, participant["headers"])
+    clinician = _make_clinician(client)
+
+    hr = client.get(
+        f"/clinical/participants/{participant['id']}/history",
+        headers=clinician["headers"],
+    )
+    assert hr.status_code == 200, hr.text
+    enrollment = hr.json()["enrollment"]
+    assert enrollment["enrolled"] is True
+    assert enrollment["age_range"] == "40-49"
+    assert enrollment["biological_sex"] == "MALE"
+    assert enrollment["region"] == "NG"
+    assert enrollment["jurisdiction"] == "NDPA"
+    # Salted hash only — never the raw MRN.
+    assert enrollment["patient_id_hash"] is not None
+    assert len(enrollment["patient_id_hash"]) == 64
+    assert enrollment["consents"] == ["TOI_IMAGING", "TRIAGE"]
+
+
+def test_history_without_enrollment_reports_not_enrolled(client: Any) -> None:
+    participant = _seed_participant(client)
+    clinician = _make_clinician(client)
+
+    hr = client.get(
+        f"/clinical/participants/{participant['id']}/history",
+        headers=clinician["headers"],
+    )
+    assert hr.status_code == 200, hr.text
+    assert hr.json()["enrollment"]["enrolled"] is False
 
 
 def test_history_unknown_participant_is_404(client: Any) -> None:

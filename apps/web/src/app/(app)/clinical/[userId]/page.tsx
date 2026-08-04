@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import {
+  type EnrollmentSummary,
   type ParticipantHistory,
   type ReferralResponse,
   type ToiTrajectoryResponse,
@@ -116,6 +117,8 @@ export default async function ParticipantRecordPage({
         </div>
       </header>
 
+      <EnrollmentCard enrollment={record.enrollment} formatLoc={formatLoc} />
+
       <ReferralsPanel
         participantId={userId}
         siteCode={p.site_code}
@@ -145,6 +148,73 @@ function BackLink(): React.ReactElement {
     <Button asChild variant="outline" size="sm">
       <Link href="/clinical">← Participant search</Link>
     </Button>
+  );
+}
+
+function EnrollmentCard({
+  enrollment,
+  formatLoc,
+}: {
+  enrollment: EnrollmentSummary;
+  formatLoc: string;
+}): React.ReactElement {
+  if (!enrollment.enrolled) {
+    return (
+      <Card>
+        <CardContent className="py-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-700">
+            Enrollment
+          </p>
+          <p className="mt-2 text-sm text-brand-600">
+            No front-of-platform enrollment record for this participant.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+  const pid = enrollment.patient_id_hash;
+  const enrolledAt = enrollment.enrolled_at
+    ? new Date(enrollment.enrolled_at).toLocaleString(formatLoc)
+    : '—';
+  const fields: Array<{ label: string; value: string; mono?: boolean }> = [
+    { label: 'Age band', value: enrollment.age_range ?? '—' },
+    { label: 'Biological sex', value: enrollment.biological_sex ?? '—' },
+    { label: 'Region', value: enrollment.region ?? '—' },
+    { label: 'Jurisdiction', value: enrollment.jurisdiction ?? '—' },
+    { label: 'Race / ethnicity', value: enrollment.race_ethnicity ?? 'Not stated' },
+    { label: 'Enrolled', value: enrolledAt },
+    {
+      label: 'Patient ID',
+      value: pid ? `${pid.slice(0, 12)}… (SHA-256)` : '—',
+      mono: true,
+    },
+    {
+      label: 'Consents',
+      value: enrollment.consents.length ? enrollment.consents.join(', ') : 'None on file',
+    },
+  ];
+  return (
+    <Card>
+      <CardContent className="py-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-700">
+          Enrollment
+        </p>
+        <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+          {fields.map((f) => (
+            <div key={f.label}>
+              <dt className="text-xs font-semibold uppercase tracking-wider text-brand-600">
+                {f.label}
+              </dt>
+              <dd
+                className={`mt-1 text-sm text-brand-950${f.mono ? ' font-mono break-all' : ''}`}
+              >
+                {f.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </CardContent>
+    </Card>
   );
 }
 

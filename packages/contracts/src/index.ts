@@ -1199,8 +1199,22 @@ export const ParticipantSummarySchema = z.object({
 });
 export type ParticipantSummary = z.infer<typeof ParticipantSummarySchema>;
 
+export const EnrollmentSummarySchema = z.object({
+  enrolled: z.boolean(),
+  age_range: z.string().nullable().optional(),
+  biological_sex: z.string().nullable().optional(),
+  region: z.string().nullable().optional(),
+  race_ethnicity: z.string().nullable().optional(),
+  jurisdiction: z.string().nullable().optional(),
+  patient_id_hash: z.string().nullable().optional(),
+  consents: z.array(z.string()).default([]),
+  enrolled_at: z.string().nullable().optional(),
+});
+export type EnrollmentSummary = z.infer<typeof EnrollmentSummarySchema>;
+
 export const ParticipantHistorySchema = z.object({
   participant: ParticipantSummarySchema,
+  enrollment: EnrollmentSummarySchema,
   triage: z.array(TriageAssessmentResponseSchema),
   toi: z.array(ToiAssessmentResponseSchema),
 });
