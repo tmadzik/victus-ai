@@ -16,14 +16,14 @@ const RISK_DISTRIBUTION = [
 
 const TRENDLINES = [
   {
-    label: 'Systolic BP — flagged cohort',
-    value: '131 mmHg',
-    points: '0,26 12,24 24,27 36,22 48,23 60,19 72,20 84,16 96,17 108,13 120,14',
-  },
-  {
     label: 'Resting HR — flagged cohort',
     value: '74 bpm',
     points: '0,18 12,21 24,17 36,22 48,18 60,21 72,16 84,19 96,14 108,16 120,12',
+  },
+  {
+    label: 'Respiratory rate — flagged cohort',
+    value: '16 br/min',
+    points: '0,24 12,22 24,25 36,20 48,21 60,18 72,19 84,16 96,17 108,14 120,15',
   },
 ] as const;
 
