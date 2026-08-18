@@ -13,21 +13,21 @@ const STEPS: MechanismStep[] = [
     step: '01',
     title: 'Identify',
     description:
-      'AI-driven scoring flags high-risk members via biometric signal processing before acute events occur.',
+      'Uncertainty-aware scoring flags higher-risk members and shows how confident the model is — resolving each to a GREEN / YELLOW / RED state.',
     icon: ScanSearch,
   },
   {
     step: '02',
     title: 'Intervene',
     description:
-      'Seamlessly route flagged members to our brick-and-mortar fitness and wellness facilities.',
+      'Route flagged members into a structured wellness programme at a Victus facility, or refer them to a partner or public clinic where that is the right destination.',
     icon: MapPin,
   },
   {
     step: '03',
     title: 'Track',
     description:
-      'Monitor continuous biometric progress and adjust clinical interventions dynamically based on real-world data.',
+      'Follow up over time through a longitudinal record, and feed real-world results back to keep the models calibrated to local populations.',
     icon: Activity,
   },
 ];

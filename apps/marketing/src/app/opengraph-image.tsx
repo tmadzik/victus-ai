@@ -38,6 +38,21 @@ export default function OpengraphImage(): ImageResponse {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24 }}>
+          <div
+            style={{
+              display: 'flex',
+              width: 10,
+              height: 10,
+              borderRadius: 9999,
+              backgroundColor: '#4aad33',
+              marginRight: 12,
+            }}
+          />
+          <div style={{ display: 'flex', fontSize: 24, color: '#9fe08d' }}>
+            Research demonstrator · In pilot across Sub-Saharan Africa
+          </div>
+        </div>
         <div
           style={{
             display: 'flex',
@@ -55,11 +70,11 @@ export default function OpengraphImage(): ImageResponse {
             display: 'flex',
             fontSize: 30,
             color: 'rgba(255,255,255,0.7)',
-            marginTop: 28,
-            maxWidth: 940,
+            marginTop: 24,
+            maxWidth: 960,
           }}
         >
-          Predictive AI risk modeling and an owned physical wellness network for healthcare funders.
+          Predictive AI risk modeling with an integrated wellness and referral network.
         </div>
       </div>
 

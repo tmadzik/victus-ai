@@ -1,4 +1,4 @@
-import { Building2, Dumbbell, RefreshCcw, type LucideIcon } from 'lucide-react';
+import { Building2, Hospital, RefreshCcw, type LucideIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 
 interface NetworkPoint {
@@ -11,19 +11,19 @@ const POINTS: NetworkPoint[] = [
   {
     title: 'Owned and operated',
     description:
-      'Victus owns its fitness and wellness facilities outright — no referral partners, no attribution gaps, full accountability for the intervention.',
+      'In markets where Victus runs its own fitness and wellness facilities, flagged members enter structured programmes with full accountability for the intervention.',
     icon: Building2,
   },
   {
-    title: 'Structured programmes',
+    title: 'Referral where it fits',
     description:
-      'Flagged members enter structured exercise and lifestyle programmes designed around their specific cardiovascular and metabolic risk profile.',
-    icon: Dumbbell,
+      'Where an owned facility isn’t the right destination, clinicians raise a referral — with urgency and a tracked status — to a partner or public clinic, so no one falls through the gap.',
+    icon: Hospital,
   },
   {
     title: 'Data flows back',
     description:
-      'Attendance and biometric measurements stream back into the platform, so every intervention is measured against the risk score that triggered it.',
+      'Programme attendance and follow-up measurements stream back into the record, so every intervention is measured against the risk that triggered it.',
     icon: RefreshCcw,
   },
 ];
@@ -34,12 +34,12 @@ export function PhysicalNetwork(): ReactElement {
       <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-12 lg:items-start">
         <div className="lg:col-span-5">
           <h2 className="text-brand-950 text-3xl font-semibold tracking-tighter text-balance sm:text-4xl">
-            An intervention network we own — not a referral list.
+            Owned facilities where we operate. Referral everywhere else.
           </h2>
           <p className="text-brand-700 mt-4 text-lg text-pretty">
-            Software alone doesn&rsquo;t lower claims. The Victus platform routes risk into physical
-            facilities we own and operate, closing the loop between prediction and measurable
-            outcome.
+            Software alone doesn&rsquo;t change outcomes. Victus routes risk into wellness
+            facilities it owns and operates in its home markets, and into partner and public clinics
+            — primary health centres, teaching hospitals — where those are the right destination.
           </p>
         </div>
         <div className="flex flex-col gap-4 lg:col-span-7">

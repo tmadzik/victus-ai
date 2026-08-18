@@ -3,8 +3,8 @@ name: Release — marketing cPanel bundle
 # Builds the self-contained marketing site bundle on Linux (matching the cPanel
 # host architecture) so it never has to be hand-built on a developer machine.
 #
-# - On a published GitHub Release: build and attach the zip to that release.
-# - On manual dispatch: build and upload the zip as a workflow artifact you can
+# - On a published GitHub Release: build and attach the archive to that release.
+# - On manual dispatch: build and upload the archive as a workflow artifact you can
 #   download from the run (no release needed).
 on:
   release:
@@ -51,8 +51,8 @@ jobs:
         id: artifact
         run: |
           ref="${{ github.event.release.tag_name || github.sha }}"
-          name="victus-marketing-cpanel-${ref}.zip"
-          cp apps/marketing/dist-cpanel/victus-marketing-cpanel.zip "$name"
+          name="victus-marketing-cpanel-${ref}.tar.gz"
+          cp apps/marketing/dist-cpanel/victus-marketing-cpanel.tar.gz "$name"
           echo "name=$name" >> "$GITHUB_OUTPUT"
 
       - name: Upload workflow artifact
