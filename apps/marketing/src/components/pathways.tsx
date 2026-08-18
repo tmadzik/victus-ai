@@ -30,7 +30,7 @@ const PATHWAYS: Pathway[] = [
     body: 'A short face-video capture reads vital signs from skin colour changes (rPPG) using CHROM / POS pipelines — a camera, not a cuff.',
     points: [
       'Reports heart rate and respiratory rate, the outputs Victus validates today.',
-      'A learned corrector removes skin-tone bias, tuned across Fitzpatrick III–VI.',
+      'CHROM and POS run in parallel and the higher-SNR method wins per capture — the step that matters most where melanin absorption is strongest.',
       'Further biomarkers stay out of scope until they have validated, single-camera ground truth.',
     ],
   },

@@ -12,8 +12,8 @@ export function Efficacy(): ReactElement {
           predictive signals earlier — instead of waiting for lagging claims data.
         </p>
         <p className="text-sm text-pretty text-white/60">
-          Calibrated for African populations and Fitzpatrick III–VI skin types, and validated
-          pathway by pathway before any clinical claim.
+          Designed for African populations, with agreement measured against skin tone — stratified
+          and reported — as a precondition to any clinical claim.
         </p>
         <p className="text-xs text-white/40">
           Source: NCD Alliance projection of avoidable NCD deaths, 2020–2030.
