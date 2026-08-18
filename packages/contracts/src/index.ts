@@ -498,6 +498,8 @@ export const ToiAssessmentRequestSchema = z.object({
     .min(TOI_CAPTURE.MIN_DURATION_S)
     .max(TOI_CAPTURE.MAX_DURATION_S),
   skin_tone_estimate: FitzpatrickScaleSchema.nullable().optional(),
+  /** Instrument-measured ITA° at the forehead ROI — primary pigmentation covariate. */
+  ita_forehead_degrees: z.number().min(-90).max(90).nullable().optional(),
   motion_score: z.number().min(0).max(1).default(1),
   lighting_score: z.number().min(0).max(1).nullable().optional(),
   face_presence_ratio: z.number().min(0).max(1).default(1),
@@ -589,6 +591,8 @@ export const RecordCalibrationRequestSchema = z.object({
     .optional()
     .nullable(),
   skin_tone_estimate: FitzpatrickScaleSchema.optional().nullable(),
+  /** Instrument-measured ITA° at the forehead ROI — primary pigmentation covariate. */
+  ita_forehead_degrees: z.number().min(-90).max(90).nullable().optional(),
   notes: z.string().max(500).optional().nullable(),
 });
 export type RecordCalibrationRequest = z.infer<
@@ -617,6 +621,7 @@ export const CalibrationRecordResponseSchema = z.object({
   rppg_snr_pos_db: z.number(),
   rppg_pipeline_version: z.string(),
   skin_tone_estimate: FitzpatrickScaleSchema.nullable(),
+  ita_forehead_degrees: z.number().nullable(),
   notes: z.string().nullable(),
   error_bpm: z.number(),
   hrv_error_ms: z.number().nullable(),
@@ -743,6 +748,8 @@ export const CreateSubjectRequestSchema = z.object({
   age_years: z.number().int().min(0).max(130),
   sex_assigned_at_birth: SexAtBirthSchema,
   fitzpatrick_scale: FitzpatrickScaleSchema.nullable().optional(),
+  /** Monk Skin Tone 1–10 — the reporting scale (validation plan §3.2). */
+  monk_skin_tone: z.number().int().min(1).max(10).nullable().optional(),
   height_cm: z.number().positive().max(250).nullable().optional(),
   weight_kg: z.number().positive().max(400).nullable().optional(),
   medical_history_summary: z.string().max(2000).nullable().optional(),
@@ -756,6 +763,7 @@ export const StudySubjectResponseSchema = z.object({
   age_years: z.number().int(),
   sex_assigned_at_birth: SexAtBirthSchema,
   fitzpatrick_scale: FitzpatrickScaleSchema.nullable(),
+  monk_skin_tone: z.number().int().nullable(),
   height_cm: z.number().nullable(),
   weight_kg: z.number().nullable(),
   medical_history_summary: z.string().nullable(),

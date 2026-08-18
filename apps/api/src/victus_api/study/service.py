@@ -79,6 +79,7 @@ async def create_subject(
             if payload.fitzpatrick_scale is not None
             else None
         ),
+        monk_skin_tone=payload.monk_skin_tone,
         height_cm=payload.height_cm,
         weight_kg=payload.weight_kg,
         medical_history_summary=payload.medical_history_summary,
@@ -107,6 +108,7 @@ async def create_subject(
             "external_subject_id": payload.external_subject_id,
             "age_years": payload.age_years,
             "sex_assigned_at_birth": payload.sex_assigned_at_birth.value,
+            "monk_skin_tone": payload.monk_skin_tone,
             "fitzpatrick_scale": payload.fitzpatrick_scale.value
             if payload.fitzpatrick_scale
             else None,
@@ -405,6 +407,7 @@ async def _subject_to_response(
                 "victus_api.toi.schemas", fromlist=["FitzpatrickScale"]
             ).FitzpatrickScale(row.fitzpatrick_scale.value)
         ),
+        monk_skin_tone=row.monk_skin_tone,
         height_cm=row.height_cm,
         weight_kg=row.weight_kg,
         medical_history_summary=row.medical_history_summary,

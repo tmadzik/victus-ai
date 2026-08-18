@@ -16,6 +16,7 @@ from sqlalchemy import (
     Index,
     Integer,
     LargeBinary,
+    SmallInteger,
     String,
     UniqueConstraint,
     func,
@@ -538,6 +539,7 @@ class RppgCalibrationRecord(Base):
     rppg_snr_chrom_db: Mapped[float] = mapped_column(Float, nullable=False)
     rppg_snr_pos_db: Mapped[float] = mapped_column(Float, nullable=False)
     rppg_pipeline_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    # Recorded secondary (see StudySubject.fitzpatrick_scale).
     skin_tone_estimate: Mapped[FitzpatrickScale | None] = mapped_column(
         SAEnum(
             FitzpatrickScale,
@@ -547,6 +549,13 @@ class RppgCalibrationRecord(Base):
         ),
         nullable=True,
     )
+    # Individual Typology Angle at the forehead ROI, in degrees:
+    #   ITA = arctan((L* − 50) / b*) × 180/π
+    # Instrument-measured and continuous — the primary pigmentation covariate
+    # for the fairness analysis, and the corrector's pigmentation feature.
+    # Measured per capture because facultative pigment varies over time, and
+    # taken at the forehead because that is the skin the camera actually reads.
+    ita_forehead_degrees: Mapped[float | None] = mapped_column(Float, nullable=True)
     notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
     study_session_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
@@ -617,6 +626,8 @@ class StudySubject(Base):
         ),
         nullable=False,
     )
+    # Retained as a recorded secondary for literature comparability only —
+    # `monk_skin_tone` below is the reporting scale (validation plan §3.2).
     fitzpatrick_scale: Mapped[FitzpatrickScale | None] = mapped_column(
         SAEnum(
             FitzpatrickScale,
@@ -626,6 +637,11 @@ class StudySubject(Base):
         ),
         nullable=True,
     )
+    # Monk Skin Tone, 1–10. Ten points give real granularity across darker skin
+    # where Fitzpatrick offers two (V, VI). Stable descriptor of the person, so
+    # it lives on the subject; the *measured* ITA° lives per capture on
+    # `rppg_calibration_records`.
+    monk_skin_tone: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     height_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
     weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
     medical_history_summary: Mapped[str | None] = mapped_column(

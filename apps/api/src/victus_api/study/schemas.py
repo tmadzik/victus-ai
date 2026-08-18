@@ -45,6 +45,8 @@ class CreateSubjectRequest(BaseModel):
     age_years: Annotated[int, Field(ge=0, le=130)]
     sex_assigned_at_birth: SexAtBirth
     fitzpatrick_scale: FitzpatrickScale | None = None
+    # Monk Skin Tone 1–10 — the reporting scale (validation plan §3.2).
+    monk_skin_tone: Annotated[int, Field(ge=1, le=10)] | None = None
     height_cm: Annotated[float, Field(gt=0.0, le=250.0)] | None = None
     weight_kg: Annotated[float, Field(gt=0.0, le=400.0)] | None = None
     medical_history_summary: str | None = Field(default=None, max_length=2000)
@@ -59,6 +61,7 @@ class StudySubjectResponse(BaseModel):
     age_years: int
     sex_assigned_at_birth: SexAtBirth
     fitzpatrick_scale: FitzpatrickScale | None
+    monk_skin_tone: int | None
     height_cm: float | None
     weight_kg: float | None
     medical_history_summary: str | None

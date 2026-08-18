@@ -63,6 +63,12 @@ class ToiAssessmentRequest(BaseModel):
     sample_rate_hz: Annotated[float, Field(gt=0.0, le=240.0)]
     duration_s: Annotated[float, Field(ge=MIN_CAPTURE_SECONDS, le=MAX_CAPTURE_SECONDS)]
     skin_tone_estimate: FitzpatrickScale | None = None
+    # Instrument-measured ITA° at the forehead ROI, when a colourimeter is
+    # present (the validation rail). Absent in the field product, where the
+    # corrector falls back to the corpus mean — see the limitation noted on
+    # `_maybe_apply_corrector`. Persisted on the paired calibration record, not
+    # here, per validation plan §5.
+    ita_forehead_degrees: Annotated[float, Field(ge=-90.0, le=90.0)] | None = None
     # Client-side quality estimates computed during capture.
     motion_score: Annotated[float, Field(ge=0.0, le=1.0)] = 1.0
     lighting_score: Annotated[float, Field(ge=0.0, le=1.0)] | None = None

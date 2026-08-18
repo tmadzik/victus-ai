@@ -1,0 +1,92 @@
+{
+  "feature_names": [
+    "rppg_hr_bpm",
+    "rppg_rr_bpm",
+    "rppg_hrv_rmssd_ms",
+    "rppg_hrv_sdnn_ms",
+    "snr_chrom_db",
+    "snr_pos_db",
+    "method_is_pos",
+    "ita_degrees"
+  ],
+  "hidden": 64,
+  "model_kind": "toi_corrector_v2",
+  "n_train": 3400,
+  "n_val": 600,
+  "residual_base_cols": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "scaler": {
+    "mean": [
+      77.65201568603516,
+      16.1042537689209,
+      42.103092193603516,
+      64.59037780761719,
+      4.425784111022949,
+      6.15687370300293,
+      0.7891176342964172,
+      -1.5029425621032715
+    ],
+    "std": [
+      13.642899513244629,
+      3.0599241256713867,
+      15.58597469329834,
+      22.07687759399414,
+      2.325840950012207,
+      1.9779268503189087,
+      0.40793272852897644,
+      29.956867218017578
+    ]
+  },
+  "target_names": [
+    "hr_bpm",
+    "rr_bpm",
+    "hrv_rmssd_ms",
+    "hrv_sdnn_ms"
+  ],
+  "validation": {
+    "by_skin_tone": {
+      "III_IV": {
+        "corrected_bias_bpm": -0.487,
+        "corrected_loa_width_bpm": 9.644,
+        "corrected_mae_bpm": 1.974,
+        "n": 186,
+        "raw_bias_bpm": 2.312,
+        "raw_loa_width_bpm": 9.268,
+        "raw_mae_bpm": 2.725
+      },
+      "I_II": {
+        "corrected_bias_bpm": -1.905,
+        "corrected_loa_width_bpm": 5.96,
+        "corrected_mae_bpm": 2.0,
+        "n": 44,
+        "raw_bias_bpm": 0.686,
+        "raw_loa_width_bpm": 5.157,
+        "raw_mae_bpm": 1.163
+      },
+      "V_VI": {
+        "corrected_bias_bpm": 0.989,
+        "corrected_loa_width_bpm": 17.718,
+        "corrected_mae_bpm": 3.672,
+        "n": 370,
+        "raw_bias_bpm": 5.521,
+        "raw_loa_width_bpm": 18.286,
+        "raw_mae_bpm": 6.024
+      }
+    },
+    "overall": {
+      "corrected_bias_bpm": 0.319,
+      "corrected_loa_width_bpm": 15.415,
+      "corrected_mae_bpm": 3.023,
+      "n": 600,
+      "raw_bias_bpm": 4.172,
+      "raw_loa_width_bpm": 16.791,
+      "raw_mae_bpm": 4.645
+    },
+    "target": "hr_bpm"
+  },
+  "version": "2.0.0"
+}

@@ -46,7 +46,7 @@ FEATURE_NAMES: tuple[str, ...] = (
     "snr_chrom_db",
     "snr_pos_db",
     "method_is_pos",
-    "fitzpatrick_ordinal",
+    "ita_degrees",
 )
 # Targets (reference-device truth), aligned to residual-base input columns 0..3.
 TARGET_NAMES: tuple[str, ...] = (
@@ -57,6 +57,8 @@ TARGET_NAMES: tuple[str, ...] = (
 )
 RESIDUAL_BASE_COLS: tuple[int, ...] = (0, 1, 2, 3)
 
+# Retained only to label the *recorded secondary* on synthetic rows; it is no
+# longer the pigmentation feature (validation plan §3).
 FITZPATRICK_ORDINAL: dict[str, int] = {
     "I": 1,
     "II": 2,
@@ -65,7 +67,38 @@ FITZPATRICK_ORDINAL: dict[str, int] = {
     "V": 5,
     "VI": 6,
 }
-MODEL_KIND = "toi_corrector_v1"
+
+# Conventional ITA° classification boundaries, darkest first. Used only to
+# derive an approximate Fitzpatrick label for synthetic rows — never to convert
+# a real measurement into a category, which would discard the resolution that
+# motivated the move to ITA in the first place.
+_ITA_TO_FITZPATRICK: tuple[tuple[float, str], ...] = (
+    (-30.0, "VI"),   # dark
+    (10.0, "V"),     # brown
+    (28.0, "IV"),    # tan
+    (41.0, "III"),   # intermediate
+    (55.0, "II"),    # light
+)
+
+
+def fitzpatrick_from_ita(ita_degrees: float) -> str:
+    """Approximate Fitzpatrick label for an ITA° reading (synthetic data only)."""
+    for upper, label in _ITA_TO_FITZPATRICK:
+        if ita_degrees < upper:
+            return label
+    return "I"
+
+
+def ita_darkness(ita_degrees: float) -> float:
+    """Map ITA° onto a 0 (lightest) → 1 (darkest) term for bias modelling.
+
+    ITA is *higher* for lighter skin, so this inverts it. The 50…−50 window
+    spans the realistic range of human skin without clipping the tails flat.
+    """
+    return float(np.clip((50.0 - ita_degrees) / 100.0, 0.0, 1.0))
+
+
+MODEL_KIND = "toi_corrector_v2"
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,10 +176,18 @@ def _masked_gaussian_nll(
 
 
 # --- corpus: synthetic bootstrap + real-export loader ----------------------
-def _draw_fitzpatrick(rng: np.random.Generator, n: int) -> np.ndarray:
-    """Skin-tone draw weighted toward IV–VI for a Sub-Saharan cohort."""
-    weights = np.array([0.05, 0.08, 0.15, 0.27, 0.25, 0.20])
-    return rng.choice(np.arange(1, 7), size=n, p=weights)
+def _draw_ita(rng: np.random.Generator, n: int) -> np.ndarray:
+    """Draw continuous ITA° weighted toward a Sub-Saharan cohort.
+
+    A mixture over the conventional bands rather than a single Gaussian, so the
+    corpus carries real spread across the dark end — the range Fitzpatrick V/VI
+    collapses and the range this corrector most needs to learn.
+    """
+    centres = np.array([50.0, 34.0, 19.0, -10.0, -40.0])
+    spreads = np.array([6.0, 6.0, 8.0, 12.0, 12.0])
+    weights = np.array([0.06, 0.12, 0.22, 0.34, 0.26])
+    comp = rng.choice(len(centres), size=n, p=weights)
+    return np.clip(rng.normal(centres[comp], spreads[comp]), -70.0, 70.0)
 
 
 def synthesize_calibration_corpus(n: int, seed: int = 17) -> list[dict[str, Any]]:
@@ -160,17 +201,18 @@ def synthesize_calibration_corpus(n: int, seed: int = 17) -> list[dict[str, Any]
     masked loss.
     """
     rng = np.random.default_rng(seed)
-    fitz = _draw_fitzpatrick(rng, n)
+    itas = _draw_ita(rng, n)
     rows: list[dict[str, Any]] = []
     for i in range(n):
-        f = int(fitz[i])
+        ita = float(itas[i])
         ref_hr = float(np.clip(rng.normal(74, 13), 45, 165))
         ref_rr = float(np.clip(rng.normal(15, 3.0), 8, 28))
         ref_rmssd = float(np.clip(rng.lognormal(np.log(35), 0.45), 8, 110))
         ref_sdnn = float(np.clip(rng.lognormal(np.log(55), 0.40), 15, 160))
 
-        # Skin-tone term: bias and noise grow from ~0 at I to a clear gap at VI.
-        skin = (f - 1) / 5.0  # 0 → 1
+        # Pigmentation term: bias and noise grow with melanin absorption,
+        # continuously — not in six steps.
+        skin = ita_darkness(ita)
         hr_bias = 0.6 + 6.5 * skin
         hr_sd = 1.2 + 4.8 * skin
         snr_chrom = float(rng.normal(7.5 - 6.0 * skin, 1.5))
@@ -192,7 +234,8 @@ def synthesize_calibration_corpus(n: int, seed: int = 17) -> list[dict[str, Any]
                 "snr_chrom_db": snr_chrom,
                 "snr_pos_db": snr_pos,
                 "method_selected": "pos" if snr_pos >= snr_chrom else "chrom",
-                "skin_tone": ["I", "II", "III", "IV", "V", "VI"][f - 1],
+                "ita_degrees": ita,
+                "skin_tone": fitzpatrick_from_ita(ita),
                 "reference_hr_bpm": ref_hr,
                 "reference_rr_bpm": ref_rr if has_rr else None,
                 "reference_hrv_rmssd_ms": ref_rmssd if has_hrv else None,
@@ -238,6 +281,11 @@ def rows_to_matrix(rows: list[dict[str, Any]]) -> list[CorrectorRow]:
     rr_mean = _col_mean("rppg_rr_bpm")
     rmssd_mean = _col_mean("rppg_hrv_rmssd_ms")
     sdnn_mean = _col_mean("rppg_hrv_sdnn_ms")
+    # Pigmentation is imputed with the corpus mean when unmeasured. The previous
+    # scheme defaulted absent skin tone to Fitzpatrick I — the *lightest* type,
+    # and so the smallest correction — which silently under-corrected exactly
+    # the captures most likely to lack a reading.
+    ita_mean = _col_mean("ita_degrees")
 
     out: list[CorrectorRow] = []
     for r in rows:
@@ -245,8 +293,9 @@ def rows_to_matrix(rows: list[dict[str, Any]]) -> list[CorrectorRow]:
         rppg_rr, _ = _impute_optional(r.get("rppg_rr_bpm"), rr_mean)
         rppg_rmssd, _ = _impute_optional(r.get("rppg_hrv_rmssd_ms"), rmssd_mean)
         rppg_sdnn, _ = _impute_optional(r.get("rppg_hrv_sdnn_ms"), sdnn_mean)
+        ita_val, _ = _impute_optional(r.get("ita_degrees"), ita_mean)
+        # Carried through for stratified *reporting* only — no longer a feature.
         skin = r.get("skin_tone")
-        fitz_ord = FITZPATRICK_ORDINAL.get(skin, 0) if skin else 0
         method_is_pos = 1.0 if str(r.get("method_selected", "chrom")) == "pos" else 0.0
         features = np.array(
             [
@@ -257,7 +306,7 @@ def rows_to_matrix(rows: list[dict[str, Any]]) -> list[CorrectorRow]:
                 float(r["snr_chrom_db"]),
                 float(r["snr_pos_db"]),
                 method_is_pos,
-                float(fitz_ord),
+                float(ita_val),
             ],
             dtype=np.float32,
         )

@@ -378,6 +378,17 @@ def _maybe_apply_corrector(
     pipeline recovered no heart rate. The correction is recorded under
     ``method_details["corrector"]`` so a reviewer can see the raw-vs-corrected
     provenance; ``signal_quality`` is left untouched.
+
+    **Known limitation (validation plan §3).** The corrector's pigmentation
+    feature is now measured ITA°, which the validation rail supplies from a
+    colourimeter but the field product cannot. Field captures therefore impute
+    the corpus mean, leaving the pigmentation term inert for exactly the
+    captures it was meant to help. Resolving this properly means *estimating*
+    ITA from the capture's own optics — the inter-channel SNR ratio is itself
+    pigmentation-sensitive — which needs the validation corpus to fit. It is
+    deliberately not faked here by mapping self-reported Fitzpatrick into a
+    continuous value, which would launder a coarse category into a precision
+    the measurement never had.
     """
     corrector = get_corrector()
     if (
@@ -387,7 +398,7 @@ def _maybe_apply_corrector(
     ):
         return pipeline
 
-    corrected = corrector.correct(pipeline, payload.skin_tone_estimate)
+    corrected = corrector.correct(pipeline, payload.ita_forehead_degrees)
     details = {
         **pipeline.method_details,
         "corrector": {

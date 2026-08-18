@@ -35,6 +35,9 @@ class RecordCalibrationRequest(BaseModel):
         Annotated[float, Field(ge=250.0, le=2000.0)]
     ] | None = None
     skin_tone_estimate: FitzpatrickScale | None = None
+    # Instrument-measured ITA° at the forehead ROI — the primary,
+    # continuous pigmentation covariate (validation plan §3.2).
+    ita_forehead_degrees: Annotated[float, Field(ge=-90.0, le=90.0)] | None = None
     notes: str | None = Field(default=None, max_length=500)
 
 
@@ -62,6 +65,7 @@ class CalibrationRecordResponse(BaseModel):
     rppg_snr_pos_db: float
     rppg_pipeline_version: str
     skin_tone_estimate: FitzpatrickScale | None
+    ita_forehead_degrees: float | None
     notes: str | None
     error_bpm: float  # rppg_hr − reference_hr (signed)
     hrv_error_ms: float | None  # rppg_rmssd − reference_rmssd (signed), if both present
