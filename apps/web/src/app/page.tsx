@@ -21,11 +21,11 @@ export default async function HomePage(): Promise<React.ReactElement> {
           className="mx-auto h-20 w-auto"
         />
         <h1 className="mt-6 text-balance text-4xl font-semibold tracking-tight text-brand-950 sm:text-5xl">
-          Precision NCD screening, calibrated for African contexts.
+          Precision NCD screening, built for African contexts.
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-balance text-brand-700">
           Dual-pathway risk prediction with explicit uncertainty quantification and
-          melanin-robust transdermal optical imaging.
+          melanin-aware transdermal optical imaging.
         </p>
       </header>
 
@@ -44,9 +44,10 @@ export default async function HomePage(): Promise<React.ReactElement> {
           <CardHeader>
             <CardTitle>TOI Biomarkers</CardTitle>
             <CardDescription>
-              Camera-based rPPG with CHROM / POS chrominance pipelines tuned for
-              Fitzpatrick III–VI skin types. Heart rate and respiratory rate,
-              plus HRV and a stress proxy (experimental).
+              Camera-based rPPG. CHROM / POS chrominance pipelines run in
+              parallel and the higher-SNR method is selected per capture — the
+              step that matters most on darker skin. Heart rate and respiratory
+              rate, plus HRV and a stress proxy (experimental).
             </CardDescription>
           </CardHeader>
         </Card>
