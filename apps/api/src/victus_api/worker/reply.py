@@ -12,7 +12,7 @@ from typing import Protocol
 
 import httpx
 
-from victus_api.core.logging import get_logger
+from victus_api.core.logging import get_logger, redact_phone
 from victus_api.worker.whatsapp_client import (
     DEFAULT_API_VERSION,
     DEFAULT_GRAPH_BASE_URL,
@@ -101,4 +101,4 @@ class WhatsAppCloudReplier:
             raise WhatsAppApiError(
                 operation="send_text", status_code=resp.status_code, body=resp.text
             )
-        log.info("whatsapp_reply_sent", to=to, chars=len(text))
+        log.info("whatsapp_reply_sent", to=redact_phone(to), chars=len(text))

@@ -25,6 +25,7 @@ from victus_api.toi.schemas import ToiAssessmentRequest
 from victus_api.toi.service import assess_toi
 from victus_api.worker import jobs
 from victus_api.worker.config import WorkerConfig
+from victus_api.worker.delivery import deliver
 from victus_api.worker.jobs import ClaimedJob
 from victus_api.worker.media import MediaFetcher
 from victus_api.worker.processor import CaptureOutcome, CaptureResult, process_capture
@@ -106,10 +107,15 @@ async def _handle_job(
     # 3. Persist + decide reply based on outcome.
     final_status = await _persist_outcome(cfg, job, result)
 
-    # 4. Reply to the user (suppressed on a retry — see _persist_outcome).
+    # 4. Reply to the user (skipped on a retry — see _persist_outcome).
     if job.wa_phone and final_status is not None:
-        with contextlib.suppress(Exception):
-            await replier.send_text(to=job.wa_phone, text=result.reply_text)
+        await deliver(
+            replier,
+            to=job.wa_phone,
+            messages=[result.reply_text],
+            kind="assessment_reply",
+            context={"job_id": str(job.id), "status": final_status.value},
+        )
 
 
 async def _persist_outcome(

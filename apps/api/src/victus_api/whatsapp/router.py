@@ -5,14 +5,13 @@ POST /whatsapp/webhook  — inbound messages: verify signature, advance the
                           conversation, enqueue captures, reply.
 
 The POST handler returns 200 quickly and never raises to Meta (a 5xx triggers
-aggressive re-delivery). Reply sending happens after the DB transaction commits
-so we never message a user about state that did not persist; send failures are
-logged, not surfaced. Heavy work (video) is deferred to the worker via the queue.
+aggressive re-delivery of a turn we have already committed). Reply sending
+happens after the DB transaction commits so we never message a user about state
+that did not persist; send failures are logged at ERROR and never surfaced to
+Meta. Heavy work (video) is deferred to the worker via the queue.
 """
 
 from __future__ import annotations
-
-import contextlib
 
 from fastapi import APIRouter, Request, Response, status
 from fastapi.responses import PlainTextResponse
@@ -29,6 +28,7 @@ from victus_api.whatsapp.meta import (
 )
 from victus_api.whatsapp.reply_factory import build_replier
 from victus_api.whatsapp.service import process_inbound
+from victus_api.worker.delivery import deliver
 
 log = get_logger(__name__)
 
@@ -77,9 +77,13 @@ async def inbound(request: Request) -> Response:
             async with session_scope() as db:
                 replies = await process_inbound(db, msg, site_code=site_code)
             # Send only after commit — never announce unpersisted state.
-            for text in replies:
-                with contextlib.suppress(Exception):
-                    await replier.send_text(to=msg.from_phone, text=text)
+            await deliver(
+                replier,
+                to=msg.from_phone,
+                messages=replies,
+                kind="conversation_reply",
+                context={"message_id": msg.message_id},
+            )
         except Exception:
             # One bad message must not fail the batch or trigger Meta retries.
             log.warning(
