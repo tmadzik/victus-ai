@@ -58,7 +58,13 @@ export default function SignInPage(): ReactElement {
         <div className="mx-auto max-w-3xl">
           <Link href="/" aria-label="Victus — home" className="inline-flex">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/victus-logo.svg" alt="Victus" className="h-8 w-auto" />
+            <img
+              src="/victus-logo.png"
+              alt="Victus"
+              width={600}
+              height={99}
+              className="h-8 w-auto"
+            />
           </Link>
         </div>
       </header>
