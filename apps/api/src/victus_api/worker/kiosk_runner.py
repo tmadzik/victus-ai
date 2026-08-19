@@ -31,6 +31,7 @@ from victus_api.toi.schemas import ToiAssessmentRequest, ToiAssessmentResponse
 from victus_api.toi.service import assess_toi
 from victus_api.worker import jobs
 from victus_api.worker.config import WorkerConfig
+from victus_api.worker.delivery import deliver
 from victus_api.worker.jobs import ClaimedJob
 from victus_api.worker.reply import Replier
 
@@ -210,10 +211,24 @@ async def _handle_kiosk_job(
             )
 
     if delivery is not None and delivery.phone:
-        with contextlib.suppress(Exception):
-            await replier.send_text(to=delivery.phone, text=delivery.message)
-            await replier.send_text(to=delivery.phone, text=_otp_message(delivery.otp))
-        log.info("kiosk_result_sent", session_id=str(session_id))
+        # The result and the OTP that unlocks it are one unit: a delivered
+        # result the participant cannot open is not a delivered result, so
+        # both are reported under a single outcome.
+        delivered = await deliver(
+            replier,
+            to=delivery.phone,
+            messages=[delivery.message, _otp_message(delivery.otp)],
+            kind="kiosk_result",
+            context={"session_id": str(session_id), "job_id": str(job.id)},
+            settings=settings,
+        )
+        # Reports what happened. This previously logged kiosk_result_sent
+        # unconditionally, so a failed send left an audit trail asserting the
+        # participant had received a screening result they never got.
+        if delivered:
+            log.info("kiosk_result_sent", session_id=str(session_id))
+        else:
+            log.error("kiosk_result_undelivered", session_id=str(session_id))
 
 
 async def _reject_capture(
@@ -235,5 +250,12 @@ async def _reject_capture(
                 phone = wa.phone if wa is not None else None
     log.info("kiosk_capture_rejected", session_id=str(session_id), reason=reason)
     if phone:
-        with contextlib.suppress(Exception):
-            await replier.send_text(to=phone, text=_RETRY_MESSAGE)
+        # A participant who is not asked to re-record simply stops — the
+        # session is already aborted, so nothing else will prompt them.
+        await deliver(
+            replier,
+            to=phone,
+            messages=[_RETRY_MESSAGE],
+            kind="kiosk_retry_request",
+            context={"session_id": str(session_id), "reason": reason},
+        )

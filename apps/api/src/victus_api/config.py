@@ -121,6 +121,11 @@ class Settings(BaseSettings):
         ),
     )
     notify_webhook_timeout_s: float = Field(default=4.0, ge=0.5, le=30.0)
+    # Minimum gap between outbound-delivery failure alerts of the same class
+    # (kind + HTTP status). An outage fails every message, so un-throttled
+    # alerting would flood the channel and bury the one line worth reading;
+    # failures inside the window are counted and reported on the next alert.
+    delivery_alert_cooldown_seconds: int = Field(default=900, ge=0, le=86_400)
     # Base URL the in-app deep links resolve against in webhook payloads. Also
     # the host the kiosk secure-result portal links resolve against.
     web_app_base_url: str = "http://localhost:3000"
