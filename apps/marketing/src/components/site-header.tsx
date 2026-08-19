@@ -17,7 +17,7 @@ export function SiteHeader(): ReactElement {
       <div className="ring-brand-100 mx-auto flex max-w-5xl items-center justify-between gap-4 rounded-full bg-white/85 py-2 pr-2 pl-5 shadow-sm ring-1 backdrop-blur-md ring-inset">
         <Link href="/" aria-label="Victus — home" className="flex shrink-0 items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/victus-logo.svg" alt="Victus" className="h-7 w-auto" />
+          <img src="/victus-logo.png" alt="Victus" width={600} height={99} className="h-7 w-auto" />
         </Link>
 
         <nav aria-label="Primary" className="hidden items-center gap-6 lg:flex">

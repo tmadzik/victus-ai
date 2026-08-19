@@ -17,7 +17,7 @@ const PILLARS: Pillar[] = [
   {
     title: 'Jurisdiction-aware',
     description:
-      'Each deployment is stamped with its country and honours the local regime — POPIA in South Africa, the Cyber & Data Protection Act in Zimbabwe, the NDPA in Nigeria — including data residency.',
+      'Each deployment is stamped with its country and honours the local regime — POPIA in South Africa, the Cyber & Data Protection Act in Zimbabwe, the NDPA in Nigeria — and runs as its own separate deployment per site.',
     icon: ShieldCheck,
   },
   {

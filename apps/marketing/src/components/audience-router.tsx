@@ -10,6 +10,8 @@ interface Audience {
   points: string[];
   icon: LucideIcon;
   href: string;
+  /** Defaults to "Sign in" for the roles that have an application login. */
+  ctaLabel?: string;
 }
 
 const AUDIENCES: Audience[] = [
@@ -30,12 +32,15 @@ const AUDIENCES: Audience[] = [
     title: 'Health insurers & funders',
     pitch: 'Find rising risk in your member base before it becomes a claim.',
     points: [
-      'Screen large member populations without a clinic visit',
+      'Screen members in the community, without a clinic visit',
       'Route flagged members into wellness or care',
-      'Follow outcomes over time, per site and per cohort',
+      'Track referrals and follow-up over time',
     ],
     icon: Building2,
-    href: '/signin',
+    // Funder access is arranged with us directly — there is no self-serve
+    // insurer login today, so this routes to the demo rather than a dead end.
+    href: '/#book-demo',
+    ctaLabel: 'Book a demo',
   },
   {
     role: 'kiosk',
@@ -93,7 +98,7 @@ export function AudienceRouter(): ReactElement {
                 href={audience.href as Route}
                 className="text-brand-700 hover:text-brand-950 mt-7 text-sm font-semibold transition-colors"
               >
-                Sign in <span aria-hidden="true">→</span>
+                {audience.ctaLabel ?? 'Sign in'} <span aria-hidden="true">→</span>
               </Link>
             </div>
           ))}

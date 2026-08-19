@@ -54,7 +54,7 @@ export function Hero(): ReactElement {
 
           <p className="mt-8 flex items-center gap-2 text-sm text-white/75">
             <span aria-hidden="true" className="bg-brand-400 size-1.5 rounded-full" />
-            Research demonstrator · in pilot in Zimbabwe and Nigeria
+            Research demonstrator · preparing pilots in Zimbabwe and Nigeria
           </p>
         </div>
       </div>

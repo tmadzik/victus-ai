@@ -1,7 +1,10 @@
 import type { ReactElement } from 'react';
 
-/* Illustrative population-risk figures only — rendered from the shared design
-   system, never from patient records. */
+/* A CONCEPT illustration of population-level reporting, not a depiction of a
+   shipped screen: the application today surfaces per-participant records,
+   history and referrals, and has no fund-wide analytics view. Figures are
+   invented and rendered from the shared design system, never patient records.
+   Keep the "concept" labelling until such a view actually exists. */
 const METRICS = [
   { label: 'Members screened', value: '12,482', delta: '+8.2%' },
   { label: 'RED referrals', value: '316', delta: '−4.1%' },
@@ -30,19 +33,19 @@ const TRENDLINES = [
 export function DashboardMockup(): ReactElement {
   return (
     <div
-      aria-label="Illustration of the Victus population risk dashboard"
+      aria-label="Concept illustration of Victus population-level reporting"
       role="img"
       className="bg-brand-950 rounded-[var(--radius-card)] p-6 text-white shadow-2xl ring-1 ring-white/10 ring-inset sm:p-8"
     >
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-xs font-medium tracking-wider text-white/50 uppercase">
-            Population Risk · Q2 2026
+            Population reporting · concept
           </p>
           <p className="mt-1 text-sm font-semibold">Fund-wide NCD overview</p>
         </div>
         <span className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold tracking-wider text-white/60 uppercase ring-1 ring-white/20 ring-inset">
-          Illustrative data
+          Illustrative concept
         </span>
       </div>
 

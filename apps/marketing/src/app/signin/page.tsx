@@ -1,4 +1,4 @@
-import { Building2, Lock, Stethoscope, Truck, type LucideIcon } from 'lucide-react';
+import { Lock, Stethoscope, Truck, type LucideIcon } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
@@ -8,7 +8,7 @@ import { APP_URL, LEGAL_NAME } from '@/lib/site';
 export const metadata: Metadata = {
   title: 'Sign in',
   description:
-    'Choose how you use Victus — clinician, health insurer, or mobile clinic kiosk — and continue to the secure Victus application.',
+    'Choose how you use Victus — clinician or mobile clinic kiosk — and continue to the secure Victus application.',
   alternates: { canonical: '/signin' },
   // A routing page, not content worth indexing.
   robots: { index: false, follow: true },
@@ -34,14 +34,6 @@ const DESTINATIONS: Destination[] = [
     icon: Stethoscope,
   },
   {
-    title: 'Health insurer or funder',
-    description:
-      'View population risk across your member base, and how flagged members move through care.',
-    cta: 'Continue to sign in',
-    href: `${APP_URL}/login?role=insurer`,
-    icon: Building2,
-  },
-  {
     title: 'Mobile clinic kiosk',
     description:
       'Start a screening terminal at a community site. Kiosks are authorised by device, not by a personal login.',
@@ -58,7 +50,13 @@ export default function SignInPage(): ReactElement {
         <div className="mx-auto max-w-3xl">
           <Link href="/" aria-label="Victus — home" className="inline-flex">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/victus-logo.svg" alt="Victus" className="h-8 w-auto" />
+            <img
+              src="/victus-logo.png"
+              alt="Victus"
+              width={600}
+              height={99}
+              className="h-8 w-auto"
+            />
           </Link>
         </div>
       </header>
@@ -116,8 +114,8 @@ export default function SignInPage(): ReactElement {
               Don&rsquo;t have an account yet?
             </h2>
             <p className="text-brand-700 mt-2 text-pretty">
-              Victus accounts are provisioned through your organisation. Tell us about your team and
-              we&rsquo;ll set you up.
+              Victus accounts are provisioned through your organisation. Health insurers and funders
+              are onboarded with us directly — tell us about your team and we&rsquo;ll set you up.
             </p>
             <Link
               href={'/#book-demo' as Route}

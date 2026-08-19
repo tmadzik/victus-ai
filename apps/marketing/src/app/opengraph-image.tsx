@@ -50,7 +50,7 @@ export default function OpengraphImage(): ImageResponse {
             }}
           />
           <div style={{ display: 'flex', fontSize: 24, color: '#9fe08d' }}>
-            Research demonstrator · In pilot across Sub-Saharan Africa
+            Research demonstrator · Built for Sub-Saharan Africa
           </div>
         </div>
         <div
