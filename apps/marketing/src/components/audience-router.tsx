@@ -25,7 +25,8 @@ const AUDIENCES: Audience[] = [
       'Raise a referral and export a PDF for the file',
     ],
     icon: Stethoscope,
-    href: '/signin',
+    href: '/for/clinicians',
+    ctaLabel: 'For clinicians',
   },
   {
     role: 'insurer',
@@ -52,7 +53,8 @@ const AUDIENCES: Audience[] = [
       'Private results delivered straight to their phone',
     ],
     icon: Truck,
-    href: '/signin',
+    href: '/for/kiosk',
+    ctaLabel: 'For community clinics',
   },
 ];
 
