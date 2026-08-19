@@ -63,7 +63,7 @@ export function HowItWorks(): ReactElement {
           <div className="lg:col-span-7">
             <DashboardMockup />
             <p className="text-grey-500 mt-3 text-center text-xs">
-              Illustrative view of the population dashboard.
+              Concept illustration of population-level reporting.
             </p>
           </div>
         </div>

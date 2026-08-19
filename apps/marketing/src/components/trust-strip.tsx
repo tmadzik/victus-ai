@@ -3,7 +3,7 @@ import type { ReactElement } from 'react';
 /* Factual capability statements only — never invented performance metrics. */
 const POINTS = [
   { value: 'No bloods', label: 'Screen with a tape measure or a camera' },
-  { value: '2 countries', label: 'Live pilots in Zimbabwe and Nigeria' },
+  { value: 'Zimbabwe · Nigeria', label: 'Pilot deployments in preparation' },
   { value: '3 conditions', label: 'Diabetes, hypertension and obesity risk' },
   { value: 'POPIA · NDPA · CDPA', label: 'Data protection built in per country' },
 ] as const;

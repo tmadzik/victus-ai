@@ -29,7 +29,7 @@ export function ValidationStatus(): ReactElement {
         </div>
 
         <div className="border-brand-100 mt-8 border-t pt-6">
-          <p className="text-brand-800 text-sm font-medium">In active pilots</p>
+          <p className="text-brand-800 text-sm font-medium">First pilot deployments</p>
           <div className="mt-3 flex flex-wrap gap-3">
             {PILOTS.map((pilot) => (
               <div
@@ -42,8 +42,8 @@ export function ValidationStatus(): ReactElement {
             ))}
           </div>
           <p className="text-grey-500 mt-3 text-sm text-pretty">
-            Each pilot is its own jurisdiction-aware deployment, with clinical validation on local
-            cohorts as an explicit precondition to any clinical claim.
+            Each pilot is prepared as its own jurisdiction-aware deployment, with prospective
+            validation on local cohorts as an explicit precondition to any clinical claim.
           </p>
         </div>
       </div>
