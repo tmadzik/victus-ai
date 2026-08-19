@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from victus_api.audit.service import write_audit
-from victus_api.core.logging import get_logger
+from victus_api.core.logging import get_logger, redact_phone
 from victus_api.db.models import (
     AuditAction,
     ConsentRecord,
@@ -166,7 +166,7 @@ async def _link_kiosk(
         return [_KIOSK_LINK_INVALID]
     row.state = ConvState.KIOSK_CONSENT.value
     row.intake = {**dict(row.intake or {}), "kiosk_session_id": str(kiosk_row.id)}
-    log.info("whatsapp_kiosk_linked", phone=msg.from_phone)
+    log.info("whatsapp_kiosk_linked", phone=redact_phone(msg.from_phone))
     return [_KIOSK_CONSENT_PROMPT]
 
 
@@ -189,7 +189,11 @@ async def _kiosk_consent(
         await kiosk_service.purge_for_whatsapp_session(db, whatsapp_session_id=row.id)
         scrubbed = await scrub_phone(db, msg.from_phone)
         await db.delete(row)
-        log.info("whatsapp_session_purged", phone=msg.from_phone, jobs_scrubbed=scrubbed)
+        log.info(
+            "whatsapp_session_purged",
+            phone=redact_phone(msg.from_phone),
+            jobs_scrubbed=scrubbed,
+        )
         return [_t("purged", row.language)]
 
     yn = _parse_yes_no(text)
@@ -256,7 +260,11 @@ async def process_inbound(
         await kiosk_service.purge_for_whatsapp_session(db, whatsapp_session_id=row.id)
         scrubbed = await scrub_phone(db, msg.from_phone)
         await db.delete(row)
-        log.info("whatsapp_session_purged", phone=msg.from_phone, jobs_scrubbed=scrubbed)
+        log.info(
+            "whatsapp_session_purged",
+            phone=redact_phone(msg.from_phone),
+            jobs_scrubbed=scrubbed,
+        )
         return turn.replies
 
     _apply(row, data)
@@ -272,12 +280,14 @@ async def process_inbound(
         await enqueue(
             db,
             media_id=turn.action.media_id,
+            # The real number: the worker delivers the result to it. Redaction
+            # belongs in logs, never in data the rail has to dial.
             wa_phone=msg.from_phone,
             wa_message_id=msg.message_id,
             language=turn.action.language,
             user_id=row.user_id,
             intake=turn.action.intake,
         )
-        log.info("whatsapp_capture_enqueued", phone=msg.from_phone)
+        log.info("whatsapp_capture_enqueued", phone=redact_phone(msg.from_phone))
 
     return turn.replies

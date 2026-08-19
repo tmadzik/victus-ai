@@ -62,3 +62,25 @@ def configure_logging(settings: Settings) -> None:
 
 def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
     return structlog.get_logger(name)
+
+
+def redact_phone(phone: str | None) -> str:
+    """Mask a phone number for logs, keeping only the last three digits.
+
+    The WhatsApp rail is the one place a direct identifier enters the system.
+    The database is careful with it — ``User`` rows hold no phone at all and
+    participants are reachable only through a pseudonymous session — but logs
+    are a separate store with wider access, longer retention, and no erasure
+    path: ``scrub_phone`` clears queued jobs, and cannot reach a line already
+    flushed to stdout and shipped off the host.
+
+    Three digits is enough to match a participant who is on the phone telling
+    you their number, which is the only support workflow that needs it. The
+    length is preserved so a malformed number still looks malformed in the logs.
+    """
+    if not phone:
+        return "<none>"
+    digits = phone.strip()
+    if len(digits) <= 3:
+        return "*" * len(digits)
+    return "*" * (len(digits) - 3) + digits[-3:]

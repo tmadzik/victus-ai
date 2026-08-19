@@ -5,20 +5,21 @@ POST /whatsapp/webhook  — inbound messages: verify signature, advance the
                           conversation, enqueue captures, reply.
 
 The POST handler returns 200 quickly and never raises to Meta (a 5xx triggers
-aggressive re-delivery). Reply sending happens after the DB transaction commits
-so we never message a user about state that did not persist; send failures are
-logged, not surfaced. Heavy work (video) is deferred to the worker via the queue.
+aggressive re-delivery of a turn we have already committed). Reply sending
+happens after the DB transaction commits so we never message a user about state
+that did not persist; send failures are logged at ERROR and never surfaced to
+Meta. Heavy work (video) is deferred to the worker via the queue.
 """
 
 from __future__ import annotations
 
-import contextlib
+from collections.abc import Sequence
 
 from fastapi import APIRouter, Request, Response, status
 from fastapi.responses import PlainTextResponse
 
 from victus_api.config import get_settings
-from victus_api.core.logging import get_logger
+from victus_api.core.logging import get_logger, redact_phone
 from victus_api.db.session import session_scope
 from victus_api.whatsapp.config import WhatsAppConfig
 from victus_api.whatsapp.meta import (
@@ -29,6 +30,7 @@ from victus_api.whatsapp.meta import (
 )
 from victus_api.whatsapp.reply_factory import build_replier
 from victus_api.whatsapp.service import process_inbound
+from victus_api.worker.reply import Replier
 
 log = get_logger(__name__)
 
@@ -47,6 +49,44 @@ async def verify(request: Request) -> Response:
     return PlainTextResponse(
         "verification failed", status_code=status.HTTP_403_FORBIDDEN
     )
+
+
+async def _send_replies(
+    replier: Replier, *, to: str, replies: Sequence[str], message_id: str
+) -> None:
+    """Deliver one turn's replies, stopping at the first failure.
+
+    A send failure must not propagate: raising here would 500 the webhook, and
+    Meta answers a 5xx by re-delivering the message — replaying a conversation
+    turn whose state has already been committed. But it must not be silent
+    either. The state *is* committed by the time we send, so a swallowed
+    failure leaves a participant waiting for a message the database believes
+    they received, with nothing anywhere recording the discrepancy. That is a
+    WhatsApp rail that is entirely dead while every dashboard reads healthy.
+
+    Stopping at the first failure is deliberate rather than lazy. The causes
+    that matter in production — an expired token, a lapsed 24-hour customer
+    service window, a 429 — apply to every reply in the turn, so continuing
+    only adds doomed requests to a rail that is already refusing them, and
+    under a 429 that is actively counterproductive.
+    """
+    for index, text in enumerate(replies):
+        try:
+            await replier.send_text(to=to, text=text)
+        except Exception as exc:
+            log.error(
+                "whatsapp_reply_send_failed",
+                message_id=message_id,
+                to=redact_phone(to),
+                reply_index=index,
+                undelivered=len(replies) - index,
+                # Present on WhatsAppApiError; the status is what separates a
+                # dead token (401) from a closed window (4xx) from throttling
+                # (429) without reading the body.
+                status_code=getattr(exc, "status_code", None),
+                exc_info=True,
+            )
+            return
 
 
 @router.post("/webhook")
@@ -77,9 +117,12 @@ async def inbound(request: Request) -> Response:
             async with session_scope() as db:
                 replies = await process_inbound(db, msg, site_code=site_code)
             # Send only after commit — never announce unpersisted state.
-            for text in replies:
-                with contextlib.suppress(Exception):
-                    await replier.send_text(to=msg.from_phone, text=text)
+            await _send_replies(
+                replier,
+                to=msg.from_phone,
+                replies=replies,
+                message_id=msg.message_id,
+            )
         except Exception:
             # One bad message must not fail the batch or trigger Meta retries.
             log.warning(
