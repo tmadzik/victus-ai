@@ -3,8 +3,6 @@
 import Link from 'next/link';
 import { useActionState } from 'react';
 
-import { UserRole } from '@victus/contracts';
-
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,12 +11,6 @@ import { Label } from '@/components/ui/label';
 import { registerAction, type ActionState } from '@/server/auth-actions';
 
 const initialState: ActionState = { ok: true };
-
-const SELF_REGISTRABLE_ROLES: { value: UserRole; label: string }[] = [
-  { value: UserRole.PATIENT, label: 'Patient' },
-  { value: UserRole.CHW, label: 'Community Health Worker' },
-  { value: UserRole.CLINICIAN, label: 'Clinician' },
-];
 
 export function RegisterForm(): React.ReactElement {
   const [state, formAction, isPending] = useActionState(registerAction, initialState);
@@ -75,22 +67,10 @@ export function RegisterForm(): React.ReactElement {
               aria-invalid={Boolean(state.fieldErrors?.password)}
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="role">I am a…</Label>
-            <select
-              id="role"
-              name="role"
-              required
-              defaultValue={UserRole.PATIENT}
-              className="flex h-10 w-full rounded-[var(--radius-control)] border border-brand-200 bg-white px-3 py-2 text-sm text-brand-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
-            >
-              {SELF_REGISTRABLE_ROLES.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <p className="text-sm text-brand-700">
+            Creating an account registers you as a participant. Clinician and community-health-worker
+            access is arranged by your organisation.
+          </p>
 
           <Button type="submit" size="lg" className="w-full" disabled={isPending}>
             {isPending ? 'Creating account…' : 'Create account'}
