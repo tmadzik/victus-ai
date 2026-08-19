@@ -1,15 +1,16 @@
 import type { ReactElement } from 'react';
 
+import { AudienceRouter } from '@/components/audience-router';
 import { Efficacy } from '@/components/efficacy';
+import { Faq } from '@/components/faq';
 import { Gateway } from '@/components/gateway';
 import { Hero } from '@/components/hero';
+import { HowItWorks } from '@/components/how-it-works';
 import { LeadCapture } from '@/components/lead-capture';
-import { Mechanism } from '@/components/mechanism';
-import { Pathways } from '@/components/pathways';
-import { PhysicalNetwork } from '@/components/physical-network';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { Trust } from '@/components/trust';
+import { TrustStrip } from '@/components/trust-strip';
 import { ValidationStatus } from '@/components/validation-status';
 
 export default function HomePage(): ReactElement {
@@ -18,13 +19,14 @@ export default function HomePage(): ReactElement {
       <SiteHeader />
       <main>
         <Hero />
-        <Pathways />
-        <Mechanism />
+        <TrustStrip />
+        <AudienceRouter />
+        <HowItWorks />
         <Gateway />
-        <PhysicalNetwork />
         <Trust />
         <ValidationStatus />
         <Efficacy />
+        <Faq />
         <LeadCapture />
       </main>
       <SiteFooter />

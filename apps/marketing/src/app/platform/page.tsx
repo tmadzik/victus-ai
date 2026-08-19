@@ -7,6 +7,7 @@ import { Button } from '@victus/ui';
 import { ClosedLoop } from '@/components/closed-loop';
 import { Gateway } from '@/components/gateway';
 import { Pathways } from '@/components/pathways';
+import { PhysicalNetwork } from '@/components/physical-network';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 
@@ -41,6 +42,7 @@ export default function PlatformPage(): ReactElement {
         <Pathways />
         <ClosedLoop />
         <Gateway />
+        <PhysicalNetwork />
 
         <section className="px-4 py-20 sm:py-28">
           <div className="ring-brand-100 bg-brand-950 mx-auto flex max-w-4xl flex-col items-center gap-6 rounded-[var(--radius-card)] px-6 py-16 text-center text-white ring-1 ring-inset sm:px-12">
@@ -52,7 +54,7 @@ export default function PlatformPage(): ReactElement {
               and we&rsquo;ll scope a pilot with you.
             </p>
             <Button asChild size="lg" variant="secondary" className="rounded-full">
-              <Link href={'/#request-pilot' as Route}>Request Pilot</Link>
+              <Link href={'/#book-demo' as Route}>Book a Demo</Link>
             </Button>
           </div>
         </section>
