@@ -32,7 +32,7 @@ from victus_api.core.exceptions import (
     InvalidCredentialsError,
     TokenInvalidError,
 )
-from victus_api.db.models import AuditAction, ConsentType, RefreshToken, User
+from victus_api.db.models import AuditAction, ConsentType, RefreshToken, User, UserRole
 
 
 async def register_user(
@@ -48,11 +48,17 @@ async def register_user(
     if existing is not None:
         raise EmailAlreadyRegisteredError("An account with this email already exists.")
 
+    # Public registration is PATIENT-only, always. A caller must never be able
+    # to choose their own role here: CLINICIAN reads identified participant
+    # records and ADMIN reaches governance and erasure, so honouring a
+    # request-supplied role would let anyone self-provision access to other
+    # people's health data. Elevated roles are granted out-of-band by an
+    # administrator.
     user = User(
         email=email_norm,
         hashed_password=hash_password(payload.password),
         full_name=payload.full_name,
-        role=payload.role,
+        role=UserRole.PATIENT,
         is_active=True,
         site_code=settings.site_code,
     )

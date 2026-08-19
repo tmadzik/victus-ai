@@ -26,10 +26,18 @@ class _Base(BaseModel):
 
 
 class RegisterRequest(_Base):
+    """Public self-registration.
+
+    Deliberately carries NO ``role`` field. Public registration always creates a
+    PATIENT (see ``register_user``); CHW / CLINICIAN / ADMIN grant access to
+    other people's identified records and must be provisioned out-of-band.
+    Because ``_Base`` sets ``extra="forbid"``, a request that still tries to
+    send ``role`` is rejected with 422 rather than silently ignored.
+    """
+
     email: EmailStr
     password: str = Field(min_length=PASSWORD_MIN_LENGTH, max_length=128)
     full_name: str = Field(min_length=2, max_length=200)
-    role: UserRole = UserRole.PATIENT
 
     @field_validator("password")
     @classmethod

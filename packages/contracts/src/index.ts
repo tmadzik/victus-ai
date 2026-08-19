@@ -57,11 +57,16 @@ export const PasswordSchema = z
   .regex(/[A-Z]/, 'Must contain an uppercase letter')
   .regex(/\d/, 'Must contain a digit');
 
+/**
+ * Public self-registration. Carries no `role`: the API always creates a PATIENT
+ * and rejects the field outright, because CLINICIAN reads identified
+ * participant records and ADMIN reaches governance. Elevated roles are
+ * provisioned by an administrator.
+ */
 export const RegisterRequestSchema = z.object({
   email: z.string().email(),
   password: PasswordSchema,
   full_name: z.string().min(2).max(200),
-  role: UserRoleSchema.default(UserRole.PATIENT),
 });
 export type RegisterRequest = z.infer<typeof RegisterRequestSchema>;
 
