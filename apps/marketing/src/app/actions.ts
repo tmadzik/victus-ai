@@ -51,7 +51,7 @@ export async function requestPilot(
   const lead = {
     email: parsed.data.email,
     consentAt: new Date().toISOString(),
-    source: 'www.victusdata.com/#request-pilot',
+    source: 'www.victusdata.com/#book-demo',
   };
 
   const result = await forwardLead(lead);

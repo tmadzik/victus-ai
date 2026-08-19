@@ -14,7 +14,7 @@ function SubmitButton(): ReactElement {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" size="lg" disabled={pending} className="shrink-0 rounded-full">
-      {pending ? 'Sending…' : 'Request Pilot'}
+      {pending ? 'Sending…' : 'Book a Demo'}
     </Button>
   );
 }
@@ -25,13 +25,14 @@ export function LeadCapture(): ReactElement {
   const renderedAt = useRef(Date.now());
 
   return (
-    <section id="request-pilot" className="scroll-mt-24 px-4 py-20 sm:py-28">
+    <section id="book-demo" className="bg-brand-950 scroll-mt-24 px-4 py-20 text-white sm:py-28">
       <div className="mx-auto flex max-w-2xl flex-col items-center gap-6 text-center">
-        <h2 className="text-brand-950 text-3xl font-semibold tracking-tighter text-balance sm:text-4xl">
-          Start Managing Population Risk.
+        <h2 className="text-3xl font-semibold tracking-tighter text-balance sm:text-4xl">
+          See Victus on your own numbers.
         </h2>
-        <p className="text-brand-700 text-lg text-pretty">
-          Deploy the Victus platform for your healthcare fund.
+        <p className="text-lg text-pretty text-white/80">
+          Book a demo and we&rsquo;ll walk your team through the platform and scope a pilot with
+          you.
         </p>
 
         {state.status === 'success' ? (
@@ -71,14 +72,14 @@ export function LeadCapture(): ReactElement {
             <input type="hidden" name="rendered_at" value={renderedAt.current} />
 
             {state.status === 'error' ? (
-              <p role="alert" className="mt-3 text-sm text-[color:var(--color-state-red-fg)]">
+              <p role="alert" className="mt-3 text-sm text-red-300">
                 {state.message}
               </p>
             ) : null}
 
-            <p className="text-grey-500 mt-4 text-xs text-pretty">
+            <p className="mt-4 text-xs text-pretty text-white/60">
               By submitting, you consent to Victus contacting you about the platform. See our{' '}
-              <Link href="/privacy" className="hover:text-brand-900 underline underline-offset-2">
+              <Link href="/privacy" className="underline underline-offset-2 hover:text-white">
                 Privacy Policy
               </Link>
               .

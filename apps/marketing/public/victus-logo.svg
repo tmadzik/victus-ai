@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2340 1560">
+<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2340 524.84">
   <defs>
     <style>
       .cls-1 {
@@ -11,17 +11,25 @@
       }
 
       .cls-3 {
-        font-family: HiraKakuStdN-W8-83pv-RKSJ-H, 'Hiragino Kaku Gothic StdN';
-        font-size: 355.76px;
+        /* The source wordmark is set in Hiragino Kaku Gothic StdN, which most
+           visitors do not have installed. The fallback stack keeps the lockup
+           rendering as a heavy grotesque everywhere instead of defaulting to a
+           serif. Convert the text to outlines if pixel-exact fidelity matters. */
+        font-family:
+          HiraKakuStdN-W8-83pv-RKSJ-H, 'Hiragino Kaku Gothic StdN', 'Inter Variable', Inter,
+          'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-weight: 800;
+        letter-spacing: 0.01em;
+        font-size: 413.22px;
       }
     </style>
   </defs>
-  <text class="cls-3" transform="translate(295.92 1306.45)"><tspan x="0" y="0">VICTUS</tspan></text>
+  <text class="cls-3" transform="translate(425.25 430.01)"><tspan x="0" y="0">VICTUS</tspan></text>
   <g>
     <g>
-      <path class="cls-1" d="M667.18,271.4l82.67,143.18c184.91,320.28,502.54-285.91,698.06-337.92h-114.67c-315.73,0-357.78,495.78-666.06,194.74Z"/>
-      <path class="cls-1" d="M868.92,620.82l145.04,251.21c25.37,43.93,66.87,43.93,92.23,0L1503.13,184.52c-146.3,25.61-327.24,436.31-634.21,436.31Z"/>
+      <path class="cls-1" d="M66.22,183.26l34.05,58.97c76.16,131.92,206.99-117.76,287.52-139.19h-47.23c-130.05,0-147.36,204.2-274.34,80.21Z"/>
+      <path class="cls-1" d="M149.31,327.18l59.74,103.47c10.45,18.09,27.54,18.09,37.99,0L410.53,147.47c-60.26,10.55-134.78,179.71-261.22,179.71Z"/>
     </g>
-    <circle class="cls-2" cx="847.02" cy="204.33" r="130.76"/>
+    <circle class="cls-2" cx="140.29" cy="155.64" r="53.86"/>
   </g>
 </svg>
