@@ -99,6 +99,12 @@ class AuditAction(str, enum.Enum):
     # A clinician/CHW searched for or opened a participant's identified record.
     CLINICIAN_PARTICIPANT_VIEWED = "CLINICIAN_PARTICIPANT_VIEWED"
     # Care-navigation referrals.
+    # Funder / insurer pathway. Individual-member access is audited separately
+    # from cohort access: the cohort view is suppressed aggregate, the member
+    # view names a person, and only the second needs an attestation behind it.
+    CARE_USE_ATTESTED = "CARE_USE_ATTESTED"
+    ORG_COHORT_VIEWED = "ORG_COHORT_VIEWED"
+    ORG_MEMBER_RISK_VIEWED = "ORG_MEMBER_RISK_VIEWED"
     REFERRAL_CREATED = "REFERRAL_CREATED"
     REFERRAL_STATUS_UPDATED = "REFERRAL_STATUS_UPDATED"
     REFERRAL_OUTCOME_RECORDED = "REFERRAL_OUTCOME_RECORDED"
@@ -260,6 +266,56 @@ class Organisation(Base):
             "OR training_export_consent_version IS NOT NULL",
             name="export_consent_needs_version",
         ),
+    )
+
+
+class CareUseAttestation(Base):
+    """A care manager's declaration that they are looking at member risk for
+    care management, and not for underwriting.
+
+    This exists because the same screen serves two purposes that are impossible
+    to distinguish technically. "Which of our members are at high risk" is care
+    coordination when it routes someone into a wellness programme, and it is
+    risk selection when it prices or declines them. The platform cannot tell
+    which is happening, so it does the two things it can: it makes the operator
+    state the purpose on the record, and it logs every access under that
+    statement.
+
+    Deliberately time-bounded. A declaration signed once at onboarding and
+    honoured forever is a checkbox; one that lapses forces periodic
+    reconfirmation and leaves a dated trail showing who asserted what, when. If
+    a funder is ever challenged over misuse, the difference between those two is
+    the difference between evidence and nothing.
+    """
+
+    __tablename__ = "care_use_attestations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=func.gen_random_uuid(),
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # Which wording was agreed to. The text will change; what somebody signed
+    # must stay recoverable after it does.
+    version: Mapped[str] = mapped_column(String(64), nullable=False)
+    attested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    # Captured for the same reason the audit log captures them: an attestation
+    # with no provenance is hard to stand behind later.
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(400), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
 

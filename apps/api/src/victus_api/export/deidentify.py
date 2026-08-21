@@ -220,3 +220,75 @@ def k_anonymise(
 
     report.rows_released = len(released)
     return released, report
+
+
+# --- aggregate cell suppression ----------------------------------------------
+#
+# Cohort dashboards publish counts, not rows, and counts leak differently. The
+# same k threshold applies — a cell of one is still a person — but suppressing
+# small cells is not sufficient on its own, which is what
+# :func:`suppress_small_cells` exists to handle.
+
+
+@dataclass
+class CellSuppressionReport:
+    k: int
+    cells_in: int = 0
+    cells_suppressed: int = 0
+    complementary_suppressed: int = 0
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "k": self.k,
+            "cells_in": self.cells_in,
+            "cells_suppressed": self.cells_suppressed,
+            "complementary_suppressed": self.complementary_suppressed,
+        }
+
+
+def suppress_small_cells(
+    cells: Mapping[str, int], *, k: int, total_is_published: bool = True
+) -> tuple[dict[str, int | None], CellSuppressionReport]:
+    """Blank every cell below ``k``, then guard against recovery by subtraction.
+
+    The subtlety is the second step. Suppressing exactly one cell while
+    publishing the total does not hide it: the reader subtracts the visible
+    cells from the total and recovers the suppressed count exactly. Disclosure
+    control calls the fix *complementary suppression* — a second cell has to go
+    so the remainder is shared between at least two unknowns.
+
+    The complement chosen is the smallest surviving cell, because blanking the
+    smallest destroys the least information while still splitting the residual.
+
+    ``total_is_published=False`` says the caller is withholding the total, which
+    removes the subtraction route and makes the complement unnecessary.
+    """
+    if k < K_FLOOR:
+        raise ReleaseSpecError(
+            f"k={k} provides no meaningful protection; the floor is {K_FLOOR}."
+        )
+
+    report = CellSuppressionReport(k=k, cells_in=len(cells))
+    out: dict[str, int | None] = {}
+    for label, count in cells.items():
+        if 0 < count < k:
+            out[label] = None
+            report.cells_suppressed += 1
+        else:
+            out[label] = count
+
+    # A zero cell is not disclosive — "nobody here" names no one — so zeros stay
+    # visible and do not count as suppressed. But they also cannot serve as the
+    # complement, since blanking a zero hides nothing.
+    if total_is_published and report.cells_suppressed == 1:
+        candidates = {
+            label: value
+            for label, value in out.items()
+            if value is not None and value > 0
+        }
+        if candidates:
+            smallest = min(candidates, key=lambda label: candidates[label])
+            out[smallest] = None
+            report.complementary_suppressed = 1
+
+    return out, report
