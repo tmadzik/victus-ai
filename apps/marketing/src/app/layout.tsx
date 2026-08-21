@@ -7,11 +7,11 @@ import './globals.css';
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'Victus — Predict NCD Risk. Prevent Avoidable Claims.',
+    default: 'Victus — Find Undiagnosed NCDs. Get People Into Care.',
     template: `%s — ${SITE_NAME}`,
   },
   description:
-    'Victus combines predictive AI risk modeling with an owned physical wellness network so healthcare funders can identify, monitor and mitigate non-communicable diseases before they escalate.',
+    'Victus screens for undiagnosed non-communicable disease in the community — no bloods, no clinic visit — and tracks every flagged person through to care, with an owned physical wellness network behind it.',
   applicationName: SITE_NAME,
   referrer: 'strict-origin-when-cross-origin',
   formatDetection: { telephone: false, email: false, address: false },
@@ -20,13 +20,13 @@ export const metadata: Metadata = {
     type: 'website',
     url: SITE_URL,
     siteName: SITE_NAME,
-    title: 'Victus — Predict NCD Risk. Prevent Avoidable Claims.',
+    title: 'Victus — Find Undiagnosed NCDs. Get People Into Care.',
     description:
-      'Closed-loop population health management for healthcare funders: AI-driven NCD risk scoring, owned physical intervention facilities, real-time outcome tracking.',
+      'Closed-loop population health for healthcare funders: community NCD screening with reported uncertainty, owned physical intervention facilities, and referral-to-outcome tracking.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Victus — Predict NCD Risk. Prevent Avoidable Claims.',
+    title: 'Victus — Find Undiagnosed NCDs. Get People Into Care.',
   },
 };
 

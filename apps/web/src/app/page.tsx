@@ -24,7 +24,7 @@ export default async function HomePage(): Promise<React.ReactElement> {
           Precision NCD screening, built for African contexts.
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-balance text-brand-700">
-          Dual-pathway risk prediction with explicit uncertainty quantification and
+          Dual-pathway risk screening with explicit uncertainty quantification and
           melanin-aware transdermal optical imaging.
         </p>
       </header>

@@ -19,6 +19,7 @@ const PATHWAYS: Pathway[] = [
     body: 'Non-invasive screening for the risk of obesity, hypertension and diabetes from tape-measure and symptom inputs — no bloods, no clinic required.',
     points: [
       'An evidential model reports its own uncertainty and resolves each person to a GREEN / YELLOW / RED referral state.',
+      'Obesity and hypertension are read from the measurements that define them. The model earns its keep on diabetes risk — the one a tape measure cannot simply be thresholded into.',
       'A domain-adversarial design makes community-health-worker measurements behave like clinical-grade ones by construction.',
       'Deterministic red-flag rules escalate danger signs regardless of what the model predicts.',
     ],

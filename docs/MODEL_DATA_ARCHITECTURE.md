@@ -121,6 +121,34 @@ measurement protocols. The exposure is in the **ML methodology and the claims**.
    *classification of prevalent disease*, not *prediction of future risk*. Claims
    of "early detection" / "risk prediction" will be challenged; the wording must
    match the design (prevalent-case detection).
+
+   > **Commercial claim boundary (binding on marketing and contracts).**
+   > For a period the public site led with *"Predict NCD risk. Prevent avoidable
+   > claims."* — both halves refuted by this very section. Being contradicted by
+   > one's own architecture record is a worse position in due diligence than
+   > having no evidence at all, so the boundary is written down here rather than
+   > left to judgement:
+   >
+   > | Do not claim | Claim instead |
+   > |---|---|
+   > | Predicts future disease / future claims | Detects disease already present but undiagnosed |
+   > | Early detection | Finds undiagnosed disease sooner than routine care would |
+   > | Reduces claims / lowers cost | *Nothing* — see below |
+   >
+   > **"Reduces claims" must not enter a contract, proposal or pricing model**
+   > until a counterfactual design (matched-cohort or stepped-wedge) has been
+   > agreed with the funder's own actuary *before* the pilot collects data. It is
+   > a causal claim assessed by actuaries, not by engineers; screened populations
+   > improve on their own through regression to the mean and self-selection, so a
+   > before/after comparison cannot support it. A design agreed after the fact
+   > cannot rescue data gathered without one. Written into an agreement, the
+   > claim becomes a warranty that cannot presently be evidenced.
+   >
+   > The three targets are also not equal, per item 1 above: obesity and
+   > hypertension are recovered from the measurements that define them, so the
+   > model adds nothing over a threshold rule for those two. **Diabetes risk
+   > without a blood test is the genuine capability** and should be sold as one
+   > specific, defensible thing rather than three loose ones.
 3. **Train/deploy population mismatch.** The study samples **facility attendees**
    ("attending facility that day") — a healthcare-seeking, enriched-prevalence
    population. The kiosk serves **walk-up community** users. Calibration and

@@ -73,7 +73,7 @@ export default async function TriagePage(): Promise<React.ReactElement> {
           <code className="font-mono">CLINICAL_GRADE</code>,{' '}
           <code className="font-mono">CHW_TAPE_MEASURE</code>, and{' '}
           <code className="font-mono">SYNTHETIC</code> measurement provenance.
-          Predictions on tape-measure inputs collected by community health
+          Risk states from tape-measure inputs collected by community health
           workers behave the same as on calibrated clinical instruments — by
           construction, not by hope.
         </AlertDescription>
