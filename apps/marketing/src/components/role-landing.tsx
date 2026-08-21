@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import type { Route } from 'next';
 import Link from 'next/link';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
 import { Button } from '@victus/ui';
 
@@ -17,6 +17,10 @@ export interface RoleLandingProps {
   primary: { label: string; href: string };
   /** How someone without access gets it. Always the demo form. */
   secondary: { label: string; note: string };
+  /** Optional block rendered after the feature grid, for anything a role needs
+   *  that the grid cannot carry — e.g. the ways of working a funder chooses
+   *  between, which are commercial arrangements rather than capabilities. */
+  extra?: ReactNode;
 }
 
 export function RoleLanding({
@@ -26,6 +30,7 @@ export function RoleLanding({
   features,
   primary,
   secondary,
+  extra,
 }: RoleLandingProps): ReactElement {
   return (
     <>
@@ -73,6 +78,8 @@ export function RoleLanding({
             ))}
           </div>
         </section>
+
+        {extra}
       </main>
       <SiteFooter />
     </>

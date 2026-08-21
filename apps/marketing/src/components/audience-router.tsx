@@ -38,10 +38,8 @@ const AUDIENCES: Audience[] = [
       'Track referrals and follow-up over time',
     ],
     icon: Building2,
-    // Funder access is arranged with us directly — there is no self-serve
-    // insurer login today, so this routes to the demo rather than a dead end.
-    href: '/#book-demo',
-    ctaLabel: 'Book a demo',
+    href: '/for/funders',
+    ctaLabel: 'For funders',
   },
   {
     role: 'kiosk',
