@@ -34,6 +34,32 @@ class UserRole(str, enum.Enum):
     CHW = "CHW"
     CLINICIAN = "CLINICIAN"
     ADMIN = "ADMIN"
+    # Organisation-side roles for the funder/insurer pathway. They belong to the
+    # client organisation, never to Victus, and exist only on a deployment bound
+    # to one organisation.
+    #
+    # CARE_MANAGER is the only role that may ever see an individual member's
+    # risk state. That is a deliberate narrowing: the same data read as
+    # underwriting — finding members who will be expensive — is a
+    # discrimination exposure for the funder and a direct harm to the member,
+    # sharpened by screening accuracy varying with skin tone. Individual-level
+    # access is gated behind this role plus a logged non-underwriting
+    # attestation (added with the dashboard that exposes the view).
+    ORG_ADMIN = "ORG_ADMIN"
+    CARE_MANAGER = "CARE_MANAGER"
+
+
+class ServiceModel(str, enum.Enum):
+    """How an organisation consumes Victus.
+
+    PLATFORM   — the organisation runs screening itself on Victus software.
+    FACILITIES — members are screened at a Victus-operated facility.
+    IN_HOUSE   — Victus attends the organisation's site to screen and consult.
+    """
+
+    PLATFORM = "PLATFORM"
+    FACILITIES = "FACILITIES"
+    IN_HOUSE = "IN_HOUSE"
 
 
 class ConsentType(str, enum.Enum):
@@ -173,6 +199,70 @@ class TriageState(str, enum.Enum):
     RED = "RED"
 
 
+class Organisation(Base):
+    """A funder, insurer or employer whose members this deployment screens.
+
+    Tenancy is a *deployment* boundary, not a row filter: one instance and one
+    database serve exactly one organisation, the way the ZW and NG pilots each
+    run their own. There is deliberately no cross-organisation query path to get
+    wrong, because the alternative — a shared instance filtering every query by
+    org — makes each future query a potential cross-tenant leak, and this data
+    is health data belonging to someone's insurer.
+
+    The row exists so the deployment knows *who it is*: which organisation it
+    serves, on what commercial footing, and whether that organisation has agreed
+    to contribute de-identified data. ``ORGANISATION_CODE`` in the environment
+    names it, and the boot guard refuses to start if it does not resolve to
+    exactly one row here.
+    """
+
+    __tablename__ = "organisations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=func.gen_random_uuid(),
+    )
+    # Stable machine identifier, matched against Settings.organisation_code.
+    org_code: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
+    display_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    service_model: Mapped[ServiceModel] = mapped_column(
+        SAEnum(ServiceModel, name="service_model", native_enum=True),
+        nullable=False,
+    )
+    # Whether this organisation has agreed that de-identified capture records
+    # may leave for model training. Default FALSE: contribution is opt-in, and
+    # an unanswered question must never read as consent. The version records
+    # *which* agreement was signed, so a later change of terms is visible
+    # rather than retroactive.
+    training_export_consent: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    training_export_consent_version: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    training_export_consent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "training_export_consent IS FALSE "
+            "OR training_export_consent_version IS NOT NULL",
+            name="export_consent_needs_version",
+        ),
+    )
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -200,6 +290,16 @@ class User(Base):
     # "NG"). Stamped at registration from the instance's configured site_code.
     site_code: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default="DEFAULT", index=True
+    )
+    # The organisation this user belongs to, on a deployment bound to one.
+    # NULL on Victus' own research and pilot deployments, which serve no
+    # organisation — so this is nullable by design rather than by omission,
+    # and `organisation_id IS NULL` is a meaningful state, not missing data.
+    organisation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organisations.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

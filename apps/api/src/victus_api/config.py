@@ -65,6 +65,19 @@ class Settings(BaseSettings):
     # with it for residency partitioning and per-site analytics/calibration.
     site_code: str = Field(default="DEFAULT", max_length=16)
 
+    # --- Organisation binding (funder / insurer pathway) -----------------------
+    # The single organisation this deployment serves, matched against
+    # organisations.org_code. Tenancy is a deployment boundary: one instance,
+    # one database, one organisation. Leave unset on Victus' own research and
+    # pilot deployments, which serve no organisation.
+    #
+    # When set, the boot guard requires it to resolve to exactly one row, and
+    # every org-scoped record written by this instance is stamped with that
+    # organisation. There is no code path that writes a record belonging to a
+    # different organisation, which is the whole point of choosing a deployment
+    # boundary over row-level filtering.
+    organisation_code: str | None = Field(default=None, max_length=32)
+
     database_url: str = Field(
         default="postgresql+asyncpg://victus:victus_dev_only_change_me@localhost:5432/victus",
         description="Async SQLAlchemy DSN (asyncpg).",
