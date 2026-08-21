@@ -160,7 +160,99 @@ records inherit the same jurisdiction.
   fairness analysis** that justified collecting it. Participants are told this at
   consent.
 
-## 7. Residual risks & mitigations
+## 7. Organisation deployments and the training export
+
+Added when the funder / insurer pathway was built. It describes a **new data
+flow to a new category of recipient**, which is what triggers a DPIA revision
+rather than a note.
+
+### 7.1 The arrangement
+
+A funder, insurer or employer ("the organisation") has members screened by
+Victus. Tenancy is a **deployment boundary**: one instance, one database, one
+organisation, with no cross-organisation query path in the software at all. The
+organisation is the controller for its members' screening data; Victus operates
+the deployment.
+
+Separately, and only with the organisation's agreement, a **de-identified
+extract** of paired camera-and-reference captures leaves the deployment to
+improve the models. This section is about that extract.
+
+### 7.2 Why the existing anonymisation path was not reused
+
+`governance/anonymiser.py` is titled "Pure pseudonymisation helpers" and is
+exactly that: a salted SHA-256 over the subject id, with the deployment holding
+the salt. Anyone holding the salt and a candidate list of subjects can reverse
+it. **That remains personal data** under POPIA, the NDPA and the Cyber and Data
+Protection Act, and it must not be described to an organisation as anonymised.
+
+It is the right mechanism for erasure-with-continuity, where a stable link is
+the point. It is the wrong mechanism for release, where the absence of a link is
+the point. The export therefore uses a separate pipeline (`export/deidentify.py`)
+and shares no code path with it.
+
+### 7.3 Controls applied to the extract
+
+| Control | What it does |
+|---|---|
+| **Allowlist projection** | Only explicitly named fields are emitted. A denylist would fail open the moment a column is added to the source table; this fails closed. |
+| **Never-release set** | Direct identifiers and relinking keys are rejected even if a developer adds them to the allowlist. |
+| **Free-text exclusion** | `notes`, `medical_history_summary` and device labels never leave. Structured k-anonymity cannot help if a note names a person. |
+| **Generalisation** | Age is banded and top-coded at 80+; skin tone is coarsened from the six-point grade to three bands. |
+| **k-anonymity, k = 5** | Rows are grouped on (age band, sex, site, skin-tone band). Any class below k is dropped. |
+| **Whole-class suppression** | No partial release — released remnants of a small class would form a small class of their own. |
+| **Consent gate** | Refuses unless the organisation has agreed under a **named agreement version**, so what was agreed can be established after the terms change. |
+| **Withdrawal** | Clears the version as well as the flag, so no stale agreement appears live. |
+| **Erasure honoured** | Subjects already anonymised under §6 are excluded from every extract. |
+| **Suppression report** | Ships with the data. Suppression falls hardest on small subgroups, so a recipient must be able to distinguish a thin cohort from a biased one. |
+
+### 7.4 Assumptions this rests on
+
+Stated plainly, because they are what a re-identification assessment must test:
+
+1. **Skin tone is treated as a quasi-identifier**, not as a sensitive attribute.
+   An adversary is assumed to be able to observe it. This is why it is banded
+   and included in the k computation.
+2. **Instrument-measured ITA°, once collected, is treated as a released
+   measurement rather than a quasi-identifier.** The assumption is that no
+   adversary holds colourimeter readings of a target. This assumption is the
+   weakest one here and should be revisited if ITA is ever recorded anywhere a
+   third party can obtain it.
+3. **The recipient is not assumed hostile,** but is assumed to hold ordinary
+   population data (age, sex, region). k = 5 is calibrated to that, not to an
+   adversary with a member roster.
+
+### 7.5 Residual risks not closed by the software
+
+1. **Transport-layer attribution.** The extract carries no organisation
+   identifier, so pooled records cannot be attributed from their contents. But a
+   file arriving from an organisation's own deployment is attributable by the
+   fact of its arrival. Closing this needs a pooling intermediary or a
+   trusted third party — an operational arrangement, not a code change. **Until
+   that exists, "not linked to the organisation" is true of the data and not of
+   the transfer, and must be described that way to organisations.**
+2. **Differencing across releases.** Two extracts taken at different times can be
+   subtracted to isolate the rows added between them, and a small difference set
+   may fall below k even though each release satisfied it. Mitigation is
+   procedural — fix a cohort definition per release, or re-run k over the union.
+   Not currently enforced in code.
+3. **k-anonymity does not prevent attribute disclosure.** If every member of an
+   equivalence class shares a screening outcome, membership of the class reveals
+   the outcome without identifying the individual. l-diversity would address
+   this and is not implemented.
+4. **No formal re-identification risk assessment has been performed.** Until one
+   is, the extract should be described as **de-identified**, not anonymous, and
+   handled as personal data by agreement.
+
+### 7.6 What must not be said
+
+The extract may not be described to an organisation, a regulator or an ethics
+committee as "anonymous" or "anonymised" until §7.5 item 4 is discharged. The
+accurate description is: *de-identified to a k-anonymity threshold of 5 with
+whole-class suppression, carrying no direct identifiers and no organisation
+identifier, subject to the residual risks in §7.5.*
+
+## 8. Residual risks & mitigations
 
 - **Re-identification via quasi-identifiers** (age band × sex × region): coarse
   by design (bands, country-level region); acceptable for the retained,
@@ -179,7 +271,7 @@ records inherit the same jurisdiction.
 - **Posture change**: this remains the platform's first identified store — RBAC-
   guarded, audited, consented, and erasure-covered from day one.
 
-## 8. Open items before enrolment
+## 9. Open items before enrolment
 
 1. **HREC/NHREC submission** must name ITA°/MST collection explicitly, including
    the colourimeter, the forehead site, and the retention-through-anonymisation
@@ -190,3 +282,15 @@ records inherit the same jurisdiction.
    accepted first.
 4. **Legal review per jurisdiction** of the §3.1 classification. The prudent
    position is taken here; local counsel should confirm it for ZW, NG and ZA.
+5. **Re-identification risk assessment** of the §7 training extract, against the
+   assumptions in §7.4 and the residual risks in §7.5, signed by someone
+   accountable. Until it is discharged the extract is **de-identified, not
+   anonymous** (§7.6), and no agreement, pitch or ethics submission may describe
+   it otherwise.
+6. **Transport-layer attribution** (§7.5 item 1) needs an operational answer —
+   pooling intermediary or trusted third party — before an organisation is told
+   its contribution is unattributable. The software cannot close this.
+
+> **Section numbering changed.** The training-export section was inserted as §7,
+> moving residual risks to §8 and this list to §9. Earlier references to
+> "§8 item 3" for the schema/corrector precondition mean **§9 item 3** below.
