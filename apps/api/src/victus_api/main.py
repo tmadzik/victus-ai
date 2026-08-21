@@ -28,6 +28,7 @@ from victus_api.governance.admin_router import router as governance_admin_router
 from victus_api.governance.router import router as governance_router
 from victus_api.kiosk.router import router as kiosk_router
 from victus_api.notifications.router import router as notifications_router
+from victus_api.organisation.router import router as organisation_router
 from victus_api.pathways.router import router as pathways_router
 from victus_api.referrals.router import router as referrals_router
 from victus_api.research.router import router as research_router
@@ -140,6 +141,7 @@ def create_app() -> FastAPI:
     app.include_router(research_router)
     app.include_router(clinical_router)
     app.include_router(referrals_router)
+    app.include_router(organisation_router)
 
     @app.get("/healthz", tags=["meta"])
     async def healthz() -> dict[str, str]:
