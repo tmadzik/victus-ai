@@ -46,11 +46,13 @@ export async function loginAction(_: ActionState, formData: FormData): Promise<A
 }
 
 export async function registerAction(_: ActionState, formData: FormData): Promise<ActionState> {
+  // No role is sent: public registration always creates a PATIENT, and the API
+  // rejects the field outright. Clinician / CHW / admin access is provisioned
+  // by an administrator, never self-selected at signup.
   const parsed = RegisterRequestSchema.safeParse({
     email: formData.get('email'),
     password: formData.get('password'),
     full_name: formData.get('full_name'),
-    role: formData.get('role') ?? 'PATIENT',
   });
   if (!parsed.success) {
     return {

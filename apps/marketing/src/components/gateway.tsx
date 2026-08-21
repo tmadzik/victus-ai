@@ -34,7 +34,7 @@ const STEPS: Step[] = [
 
 export function Gateway(): ReactElement {
   return (
-    <section id="gateway" className="bg-brand-50 scroll-mt-24 px-4 py-20 sm:py-28">
+    <section id="gateway" className="scroll-mt-24 px-4 py-20 sm:py-28">
       <div className="mx-auto max-w-6xl">
         <div className="max-w-2xl">
           <p className="text-brand-500 text-xs font-semibold tracking-wider uppercase">

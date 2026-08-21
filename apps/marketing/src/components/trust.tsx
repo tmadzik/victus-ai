@@ -17,7 +17,7 @@ const PILLARS: Pillar[] = [
   {
     title: 'Jurisdiction-aware',
     description:
-      'Each deployment is stamped with its country and honours the local regime — POPIA in South Africa, the Cyber & Data Protection Act in Zimbabwe, the NDPA in Nigeria — including data residency.',
+      'Each deployment is stamped with its country and honours the local regime — POPIA in South Africa, the Cyber & Data Protection Act in Zimbabwe, the NDPA in Nigeria — and runs as its own separate deployment per site.',
     icon: ShieldCheck,
   },
   {
@@ -36,7 +36,7 @@ const PILLARS: Pillar[] = [
 
 export function Trust(): ReactElement {
   return (
-    <section id="trust" className="scroll-mt-24 px-4 py-20 sm:py-28">
+    <section id="trust" className="bg-brand-50 scroll-mt-24 px-4 py-20 sm:py-28">
       <div className="mx-auto max-w-6xl">
         <div className="max-w-2xl">
           <h2 className="text-brand-950 text-3xl font-semibold tracking-tighter text-balance sm:text-4xl">

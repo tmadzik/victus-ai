@@ -45,7 +45,7 @@ const organizationJsonLd = {
   '@type': 'Organization',
   name: LEGAL_NAME,
   url: SITE_URL,
-  logo: `${SITE_URL}/victus-logo.svg`,
+  logo: `${SITE_URL}/victus-logo.png`,
 };
 
 export default function RootLayout({

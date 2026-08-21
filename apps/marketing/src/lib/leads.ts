@@ -3,7 +3,13 @@ import nodemailer from 'nodemailer';
 import { getLeadEnv, smtpConfigured, webhookConfigured } from '@/lib/env';
 
 export interface PilotLead {
+  fullName: string;
   email: string;
+  organisation: string;
+  /** Which audience the enquirer identified themselves as. */
+  role: string;
+  country?: string;
+  message?: string;
   /** ISO timestamp of the POPIA consent given by submitting the form. */
   consentAt: string;
   source: string;
@@ -32,11 +38,19 @@ async function sendSmtp(lead: PilotLead): Promise<void> {
     from: env.LEAD_NOTIFY_FROM ?? env.SMTP_USER,
     to: env.LEAD_NOTIFY_TO,
     replyTo: lead.email,
-    subject: `New pilot request — ${lead.email}`,
+    subject: `Demo request — ${lead.organisation} (${lead.role})`,
     text: [
-      'A new pilot request was submitted on www.victusdata.com.',
+      'A new demo request was submitted on www.victusdata.com.',
       '',
+      `Name:            ${lead.fullName}`,
       `Work email:      ${lead.email}`,
+      `Organisation:    ${lead.organisation}`,
+      `They are a:      ${lead.role}`,
+      `Country:         ${lead.country ?? '—'}`,
+      '',
+      'Message:',
+      lead.message?.trim() ? lead.message : '(none)',
+      '',
       `Consent given:   ${lead.consentAt} (POPIA — contact about the Victus platform)`,
       `Source:          ${lead.source}`,
       '',
@@ -55,7 +69,12 @@ async function sendWebhook(lead: PilotLead): Promise<void> {
     },
     body: JSON.stringify({
       type: 'pilot_request',
+      full_name: lead.fullName,
       email: lead.email,
+      organisation: lead.organisation,
+      role: lead.role,
+      country: lead.country ?? null,
+      message: lead.message ?? null,
       consent_at: lead.consentAt,
       consent_basis: 'POPIA explicit consent — contact about the Victus platform',
       source: lead.source,

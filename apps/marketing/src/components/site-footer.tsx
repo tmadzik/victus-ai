@@ -15,7 +15,14 @@ export function SiteFooter(): ReactElement {
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 sm:flex-row">
         <div className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/victus-logo.svg" alt="" aria-hidden="true" className="h-6 w-auto" />
+          <img
+            src="/victus-logo.png"
+            alt=""
+            aria-hidden="true"
+            width={600}
+            height={99}
+            className="h-6 w-auto"
+          />
           <p className="text-grey-500 text-sm">© 2026 {LEGAL_NAME}</p>
         </div>
         <nav aria-label="Legal" className="flex items-center gap-6">

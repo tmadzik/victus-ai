@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 
+import { ENQUIRY_COUNTRIES, ENQUIRY_ROLES } from '@/lib/enquiry';
 import { forwardLead } from '@/lib/leads';
 
 export interface PilotRequestState {
@@ -10,7 +11,14 @@ export interface PilotRequestState {
 }
 
 const pilotRequestSchema = z.object({
+  fullName: z.string().trim().min(2, 'Enter your name.').max(200),
   email: z.string().trim().toLowerCase().email('Enter a valid work email.').max(254),
+  organisation: z.string().trim().min(2, 'Enter your organisation.').max(200),
+  role: z.enum(ENQUIRY_ROLES, {
+    errorMap: () => ({ message: 'Tell us which best describes you.' }),
+  }),
+  country: z.enum(ENQUIRY_COUNTRIES).optional(),
+  message: z.string().trim().max(2000).optional(),
 });
 
 /** Bots fill every field; humans never see this one. */
@@ -38,20 +46,27 @@ export async function requestPilot(
     return SUCCESS;
   }
 
-  const parsed = pilotRequestSchema.safeParse({ email: formData.get('email') });
+  const parsed = pilotRequestSchema.safeParse({
+    fullName: formData.get('full_name'),
+    email: formData.get('email'),
+    organisation: formData.get('organisation'),
+    role: formData.get('role'),
+    country: formData.get('country') || undefined,
+    message: formData.get('message') || undefined,
+  });
   if (!parsed.success) {
     return {
       status: 'error',
-      message: parsed.error.issues[0]?.message ?? 'Enter a valid work email.',
+      message: parsed.error.issues[0]?.message ?? 'Please check the form and try again.',
     };
   }
 
   // POPIA: submission is explicit consent to be contacted about the platform —
   // the consent timestamp travels with the lead on every channel.
   const lead = {
-    email: parsed.data.email,
+    ...parsed.data,
     consentAt: new Date().toISOString(),
-    source: 'www.victusdata.com/#request-pilot',
+    source: 'www.victusdata.com/#book-demo',
   };
 
   const result = await forwardLead(lead);

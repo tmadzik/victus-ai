@@ -3,16 +3,43 @@ clean synthetic rPPG signal generator."""
 
 from __future__ import annotations
 
+import asyncio
 import math
+import os
 import uuid
 from typing import Any
+
+from sqlalchemy import func, update
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.pool import NullPool
+
+from victus_api.db.models import User, UserRole
 
 PASSWORD = "VictusTest!2026"
 
 
+async def _set_role(email: str, role: UserRole) -> None:
+    engine = create_async_engine(os.environ["DATABASE_URL"], poolclass=NullPool)
+    try:
+        async with AsyncSession(engine) as s:
+            await s.execute(
+                update(User).where(func.lower(User.email) == email.lower()).values(role=role)
+            )
+            await s.commit()
+    finally:
+        await engine.dispose()
+
+
 def register(client: Any, role: str) -> dict[str, Any]:
     """Register a uniquely-named account and return its id, email, bearer
-    headers, and refresh token."""
+    headers, and refresh token.
+
+    Public registration is PATIENT-only by design (see ``RegisterRequest``), so
+    an elevated role is granted out-of-band the way an administrator would —
+    straight to the database. No re-login is needed: ``get_current_user`` loads
+    the user per request and ``require_role`` checks the live database role, not
+    a claim baked into the token.
+    """
     email = f"{role.lower()}_{uuid.uuid4().hex[:10]}@example.com"
     resp = client.post(
         "/auth/register",
@@ -20,11 +47,14 @@ def register(client: Any, role: str) -> dict[str, Any]:
             "email": email,
             "password": PASSWORD,
             "full_name": f"Test {role.title()}",
-            "role": role,
         },
     )
     assert resp.status_code in (200, 201), resp.text
     body = resp.json()
+
+    if role != UserRole.PATIENT.value:
+        asyncio.run(_set_role(email, UserRole(role)))
+
     return {
         "id": body["user"]["id"],
         "email": email,
