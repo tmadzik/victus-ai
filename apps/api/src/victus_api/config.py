@@ -18,6 +18,19 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # refuses to boot if the kiosk key is still this placeholder.
 KIOSK_DEV_ENCRYPTION_KEY = "00" * 32
 
+# Site codes that resolve to a data-protection regime in
+# ``governance.jurisdictions``. Duplicated here as a plain literal rather than
+# imported, because that module reaches the ORM and config must stay free of
+# application imports; ``test_site_code_guard`` fails if the two ever drift.
+#
+# The production guard rejects anything outside this set. A site code with no
+# mapping does not fail loudly — it silently falls back to the caller's default
+# regime, so a Zimbabwean pilot left on DEMO would record its participants under
+# whatever jurisdiction the fallback names rather than the CDPA. And because the
+# code is stamped onto every row at creation and never revisited, the damage is
+# not retroactively fixable by editing the environment later.
+KNOWN_SITE_CODES = frozenset({"NG", "ZA", "ZW"})
+
 
 def _repo_root() -> Path:
     here = Path(__file__).resolve()
@@ -205,6 +218,14 @@ class Settings(BaseSettings):
             raise RuntimeError("PSEUDO_SALT is still the development placeholder")
         if self.kiosk_encryption_key.get_secret_value() == KIOSK_DEV_ENCRYPTION_KEY:
             raise RuntimeError("KIOSK_ENCRYPTION_KEY is still the development placeholder")
+        if self.site_code.strip().upper() not in KNOWN_SITE_CODES:
+            raise RuntimeError(
+                f"SITE_CODE is '{self.site_code}', which maps to no data-protection "
+                f"regime. Set one of {sorted(KNOWN_SITE_CODES)} before serving real "
+                "participants: the code is stamped onto every record at creation "
+                "and decides which law governs it, so it cannot be corrected "
+                "afterwards by changing the environment."
+            )
 
 
 @lru_cache(maxsize=1)
