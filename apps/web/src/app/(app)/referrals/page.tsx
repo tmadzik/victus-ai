@@ -13,7 +13,7 @@ import { getLocale } from '@/i18n';
 import { ApiError, apiClient } from '@/lib/api-client';
 import { auth } from '@/lib/auth';
 
-export const metadata = { title: 'Referrals — Victus AI' };
+export const metadata = { title: 'Referrals' };
 
 const STATUS_TONE: Record<string, BadgeProps['tone']> = {
   PENDING: 'yellow',

@@ -84,6 +84,14 @@ import {
   UnreadCountResponseSchema,
   UserPublicSchema,
   type UserPublic,
+  type AttestationResponse,
+  AttestationResponseSchema,
+  type AttestationStatus,
+  AttestationStatusSchema,
+  type CohortReport,
+  CohortReportSchema,
+  type FlaggedMemberList,
+  FlaggedMemberListSchema,
 } from '@victus/contracts';
 
 import { serverEnv } from './env';
@@ -741,6 +749,38 @@ export const apiClient = {
       body: payload,
     });
     return ReferralResponseSchema.parse(raw);
+  },
+
+  // ---- Organisation cohort dashboard --------------------------------------
+
+  async getCohortReport(accessToken: string): Promise<CohortReport> {
+    const raw = await request<unknown>('/organisation/cohort', { accessToken });
+    return CohortReportSchema.parse(raw);
+  },
+
+  async getAttestationStatus(accessToken: string): Promise<AttestationStatus> {
+    const raw = await request<unknown>('/organisation/attestation', { accessToken });
+    return AttestationStatusSchema.parse(raw);
+  },
+
+  async recordAttestation(accessToken: string): Promise<AttestationResponse> {
+    const raw = await request<unknown>('/organisation/attestation', {
+      method: 'POST',
+      accessToken,
+      body: {},
+    });
+    return AttestationResponseSchema.parse(raw);
+  },
+
+  /**
+   * Named members for care routing. Requires a live care-use attestation; the
+   * API returns 403 with the wording to agree to when there is none.
+   */
+  async getFlaggedMembers(accessToken: string): Promise<FlaggedMemberList> {
+    const raw = await request<unknown>('/organisation/members/flagged', {
+      accessToken,
+    });
+    return FlaggedMemberListSchema.parse(raw);
   },
 
   async getCareLoopStats(accessToken: string): Promise<CareLoopStats> {

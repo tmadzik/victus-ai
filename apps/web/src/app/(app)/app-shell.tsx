@@ -24,6 +24,7 @@ type NavHref =
   | '/clinical'
   | '/research'
   | '/account/data'
+  | '/organisation'
   | '/admin/governance';
 
 type NavKey = keyof Dictionary['nav'];
@@ -43,6 +44,12 @@ const CLINICAL_NAV: NavItem[] = [{ href: '/clinical', key: 'clinical' }];
 
 // Researchers (CHW / clinician / admin) get the labelled-data capture console.
 const RESEARCH_NAV: NavItem[] = [{ href: '/research', key: 'research' }];
+
+// Organisation staff (funder / insurer deployments) get the cohort overview.
+// Individual member views live behind it, gated by the care-use attestation.
+const ORG_NAV: NavItem[] = [{ href: '/organisation', key: 'organisation' }];
+
+const ORG_ROLES: readonly UserRole[] = [UserRole.ORG_ADMIN, UserRole.CARE_MANAGER];
 
 const ADMIN_NAV: NavItem[] = [{ href: '/admin/governance', key: 'admin' }];
 
@@ -75,6 +82,7 @@ export function AppShell({
     ...NAV,
     ...(isClinical ? CLINICAL_NAV : []),
     ...(RESEARCHER_ROLES.includes(user.role) ? RESEARCH_NAV : []),
+    ...(ORG_ROLES.includes(user.role) ? ORG_NAV : []),
     ...(user.role === UserRole.ADMIN ? ADMIN_NAV : []),
   ];
 

@@ -20,6 +20,7 @@ export const en = {
     clinical: 'Clinical',
     research: 'Research',
     data: 'Data & erasure',
+    organisation: 'Cohort',
     admin: 'Admin',
     signOut: 'Sign out',
     notifications: 'Notifications',

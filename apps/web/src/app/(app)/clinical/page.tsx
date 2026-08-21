@@ -9,7 +9,7 @@ import { getLocale } from '@/i18n';
 import { ApiError, apiClient } from '@/lib/api-client';
 import { auth } from '@/lib/auth';
 
-export const metadata = { title: 'Participant review — Victus AI' };
+export const metadata = { title: 'Participant review' };
 
 const CLINICAL_ROLES: readonly UserRole[] = [UserRole.CLINICIAN, UserRole.ADMIN];
 
