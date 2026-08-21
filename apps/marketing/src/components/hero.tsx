@@ -31,7 +31,7 @@ export function Hero(): ReactElement {
             Non-communicable disease screening, built for Africa
           </p>
           <h1 className="mt-4 text-4xl font-semibold tracking-tighter text-balance text-white sm:text-5xl lg:text-6xl">
-            Predict NCD risk. Prevent avoidable claims.
+            Find undiagnosed NCDs. Get people into care.
           </h1>
           <p className="mt-5 text-lg leading-relaxed text-pretty text-white/85">
             Screen people for diabetes, hypertension and obesity risk with nothing more than a tape

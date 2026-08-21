@@ -31,7 +31,7 @@ const AUDIENCES: Audience[] = [
   {
     role: 'insurer',
     title: 'Health insurers & funders',
-    pitch: 'Find rising risk in your member base before it becomes a claim.',
+    pitch: 'Find undiagnosed disease in your member base, and see who actually reaches care.',
     points: [
       'Screen members in the community, without a clinic visit',
       'Route flagged members into wellness or care',

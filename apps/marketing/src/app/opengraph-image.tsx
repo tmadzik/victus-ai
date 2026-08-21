@@ -4,7 +4,7 @@ import { ImageResponse } from 'next/og';
 // static PNG, so the cPanel runtime never invokes the image renderer.
 export const runtime = 'nodejs';
 
-export const alt = 'Victus — Predict NCD Risk. Prevent Avoidable Claims.';
+export const alt = 'Victus — Find Undiagnosed NCDs. Get People Into Care.';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -63,7 +63,7 @@ export default function OpengraphImage(): ImageResponse {
             maxWidth: 1010,
           }}
         >
-          Predict NCD Risk. Prevent Avoidable Claims.
+          Find Undiagnosed NCDs. Get People Into Care.
         </div>
         <div
           style={{
@@ -74,7 +74,7 @@ export default function OpengraphImage(): ImageResponse {
             maxWidth: 960,
           }}
         >
-          Predictive AI risk modeling with an integrated wellness and referral network.
+          Community NCD screening with an integrated wellness and referral network.
         </div>
       </div>
 

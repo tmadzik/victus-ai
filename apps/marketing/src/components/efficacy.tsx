@@ -8,8 +8,8 @@ export function Efficacy(): ReactElement {
           Stop the 90 Million.
         </h2>
         <p className="text-lg leading-relaxed text-pretty text-white/80">
-          NCDs will claim 90 million avoidable lives this decade. The opportunity is to act on
-          predictive signals earlier — instead of waiting for lagging claims data.
+          NCDs will claim 90 million avoidable lives this decade. Much of that burden is already
+          present and undiagnosed — findable today with a tape measure and a phone camera.
         </p>
         <p className="text-sm text-pretty text-white/60">
           Designed for African populations, with agreement measured against skin tone — stratified

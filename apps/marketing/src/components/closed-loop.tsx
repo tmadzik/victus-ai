@@ -48,7 +48,7 @@ export function ClosedLoop(): ReactElement {
             One closed loop, from screen to outcome.
           </h2>
           <p className="text-brand-700 mt-4 text-lg text-pretty">
-            Prediction only matters if it changes what happens next. Victus connects screening to a
+            A screening result only matters if it changes what happens next. Victus connects screening to a
             clinician, a referral, and a tracked outcome — as one auditable pathway.
           </p>
         </div>
