@@ -46,6 +46,7 @@ export function ReferenceEntryForm({
   const [hr, setHr] = useState(prefill ? String(prefill.hr_bpm) : '');
   const [rr, setRr] = useState('');
   const [fitz, setFitz] = useState<FitzpatrickScale | ''>('');
+  const [ita, setIta] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
@@ -91,6 +92,7 @@ export function ReferenceEntryForm({
             ? prefill.rr_intervals_ms
             : null,
         skin_tone_estimate: fitz === '' ? null : fitz,
+        ita_forehead_degrees: ita === '' ? null : Number(ita),
         notes: notes.trim() || null,
       });
       if (!result.ok) {
@@ -217,6 +219,24 @@ export function ReferenceEntryForm({
             value={rr}
             onChange={(e) => setRr(e.target.value)}
           />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="ita">Measured ITA° at forehead (optional)</Label>
+          <Input
+            id="ita"
+            type="number"
+            inputMode="decimal"
+            step="0.1"
+            min={-90}
+            max={90}
+            placeholder="e.g. -32.5"
+            value={ita}
+            onChange={(e) => setIta(e.target.value)}
+          />
+          <p className="text-xs text-brand-600">
+            Colourimeter reading at the ROI the camera reads. The primary
+            pigmentation covariate — Fitzpatrick below is kept as a secondary.
+          </p>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="fitz">Fitzpatrick skin tone (optional)</Label>

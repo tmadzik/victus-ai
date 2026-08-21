@@ -30,6 +30,7 @@ export function SubjectForm({
   const [age, setAge] = useState('');
   const [sex, setSex] = useState<SexAtBirth>(SexAtBirth.PREFER_NOT_TO_SAY);
   const [fitz, setFitz] = useState<FitzpatrickScale | ''>('');
+  const [monk, setMonk] = useState('');
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
   const [historySummary, setHistorySummary] = useState('');
@@ -64,6 +65,7 @@ export function SubjectForm({
         age_years: ageNum,
         sex_assigned_at_birth: sex,
         fitzpatrick_scale: fitz === '' ? null : fitz,
+        monk_skin_tone: monk === '' ? null : Number(monk),
         height_cm: heightNum,
         weight_kg: weightNum,
         medical_history_summary: historySummary.trim() || null,
@@ -147,7 +149,23 @@ export function SubjectForm({
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="monk">Monk skin tone</Label>
+              <select
+                id="monk"
+                value={monk}
+                onChange={(e) => setMonk(e.target.value)}
+                className="flex h-10 w-full rounded-[var(--radius-control)] border border-brand-200 bg-white px-3 py-2 text-sm text-brand-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+              >
+                <option value="">—</option>
+                {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                  <option key={n} value={String(n)}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="space-y-1.5">
               <Label htmlFor="fitz">Fitzpatrick</Label>
               <select

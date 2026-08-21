@@ -70,11 +70,116 @@ class CalibrationStats:
 
 
 @dataclass(frozen=True, slots=True)
+class PigmentationRegression:
+    """Least-squares fit of an agreement measure on ITA° (validation plan §3.4).
+
+    This is the *primary* fairness readout: a slope whose confidence interval
+    excludes a clinically material effect is a dose-response result across the
+    whole pigmentation range, and needs far fewer subjects than pairwise
+    comparison of categories. ``slope`` is in units-per-degree, so a negative
+    ITA slope on absolute error means error grows as skin darkens (ITA falls).
+    """
+
+    n: int
+    slope: float
+    slope_ci_lower: float
+    slope_ci_upper: float
+    intercept: float
+    pearson_r: float
+    p_value: float
+    ita_min: float
+    ita_max: float
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "n": self.n,
+            "slope": self.slope,
+            "slope_ci_lower": self.slope_ci_lower,
+            "slope_ci_upper": self.slope_ci_upper,
+            "intercept": self.intercept,
+            "pearson_r": self.pearson_r,
+            "p_value": self.p_value,
+            "ita_min": self.ita_min,
+            "ita_max": self.ita_max,
+        }
+
+
+# Monk Skin Tone analysis bands (validation plan §3.4): the light end is
+# collapsed because it is sparse in the target population, and the dark end is
+# resolved because that is the range Fitzpatrick V/VI conflates.
+MONK_BANDS: tuple[tuple[str, int, int], ...] = (
+    ("MST_1_4", 1, 4),
+    ("MST_5_6", 5, 6),
+    ("MST_7_8", 7, 8),
+    ("MST_9_10", 9, 10),
+)
+
+
+def regress_on_ita(
+    pairs: Iterable[CalibrationPair], *, measure: str = "abs_error"
+) -> PigmentationRegression | None:
+    """Regress an agreement measure on ITA°. ``None`` when under-determined.
+
+    ``measure`` is ``"abs_error"`` (|rPPG − reference| HR) or ``"snr"``.
+    Needs at least three pairs carrying ITA, and a non-degenerate ITA spread —
+    a fit across subjects who all share one skin tone says nothing about skin
+    tone, and silently reporting a slope from it would be worse than reporting
+    nothing.
+    """
+    usable = [p for p in pairs if p.ita_degrees is not None]
+    if measure == "snr":
+        usable = [p for p in usable if p.rppg_snr_db is not None]
+    if len(usable) < 3:
+        return None
+
+    x = np.array([float(p.ita_degrees) for p in usable], dtype=float)  # type: ignore[arg-type]
+    if float(np.ptp(x)) < 1e-9:
+        return None
+
+    if measure == "snr":
+        y = np.array([float(p.rppg_snr_db) for p in usable], dtype=float)  # type: ignore[arg-type]
+    else:
+        y = np.array(
+            [abs(p.rppg_hr_bpm - p.reference_hr_bpm) for p in usable], dtype=float
+        )
+
+    fit = scipy_stats.linregress(x, y)
+
+    # A perfectly flat y (no residual variance) leaves the correlation as 0/0,
+    # so scipy returns NaN for r, p and stderr. That is a degenerate fit, not a
+    # missing one: the slope really is zero and really is certain. Emitting the
+    # NaNs instead would put invalid JSON on the wire and render as a blank cell
+    # that looks like "not computed" rather than "no effect".
+    slope = float(fit.slope) if np.isfinite(fit.slope) else 0.0
+    stderr = float(fit.stderr) if np.isfinite(fit.stderr) else 0.0
+    rvalue = float(fit.rvalue) if np.isfinite(fit.rvalue) else 0.0
+    pvalue = float(fit.pvalue) if np.isfinite(fit.pvalue) else 1.0
+
+    # 95% CI on the slope: t(0.975, n−2) × standard error.
+    tcrit = float(scipy_stats.t.ppf(0.975, len(usable) - 2))
+    half = tcrit * stderr
+    return PigmentationRegression(
+        n=len(usable),
+        slope=round(slope, 5),
+        slope_ci_lower=round(slope - half, 5),
+        slope_ci_upper=round(slope + half, 5),
+        intercept=round(float(fit.intercept), 4),
+        pearson_r=round(rvalue, 4),
+        p_value=pvalue,
+        ita_min=round(float(np.min(x)), 2),
+        ita_max=round(float(np.max(x)), 2),
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class StratifiedStats:
     overall: CalibrationStats | None
     overall_hrv: HrvCalibrationStats | None = None
     by_quality: dict[str, CalibrationStats | None] = field(default_factory=dict)
     by_fitzpatrick: dict[str, CalibrationStats | None] = field(default_factory=dict)
+    by_monk_band: dict[str, CalibrationStats | None] = field(default_factory=dict)
+    ita_error_regression: PigmentationRegression | None = None
+    ita_snr_regression: PigmentationRegression | None = None
     by_reference_device: dict[str, CalibrationStats | None] = field(default_factory=dict)
     by_posture: dict[str, CalibrationStats | None] = field(default_factory=dict)
     by_time_of_day: dict[str, CalibrationStats | None] = field(default_factory=dict)
@@ -92,6 +197,15 @@ class StratifiedStats:
                 (k if k is not None else "UNKNOWN"): _maybe(v)
                 for k, v in self.by_fitzpatrick.items()
             },
+            "by_monk_band": {k: _maybe(v) for k, v in self.by_monk_band.items()},
+            "ita_error_regression": (
+                self.ita_error_regression.to_dict()
+                if self.ita_error_regression
+                else None
+            ),
+            "ita_snr_regression": (
+                self.ita_snr_regression.to_dict() if self.ita_snr_regression else None
+            ),
             "by_reference_device": {
                 k: _maybe(v) for k, v in self.by_reference_device.items()
             },
@@ -108,8 +222,13 @@ class CalibrationPair:
     rppg_hr_bpm: float
     reference_hr_bpm: float
     quality: str
-    skin_tone: str | None  # "I" … "VI" or None
+    skin_tone: str | None  # "I" … "VI" or None — recorded secondary only
     reference_device_type: str
+    # Pigmentation (validation plan §3). ITA° is the primary, continuous
+    # covariate; Monk Skin Tone carries the banded secondary reporting.
+    ita_degrees: float | None = None
+    monk_skin_tone: int | None = None
+    rppg_snr_db: float | None = None
     # HRV agreement only contributes when both sides are present (BLE
     # auto-pair from a chest strap providing RR intervals).
     rppg_hrv_rmssd_ms: float | None = None
@@ -339,6 +458,16 @@ def compute_stratified(
         key = fz if fz is not None else "UNKNOWN"
         by_fitzpatrick[key] = compute_stats(subset)
 
+    by_monk_band: dict[str, CalibrationStats | None] = {}
+    for label, lo, hi in MONK_BANDS:
+        subset = [
+            p
+            for p in pair_list
+            if p.monk_skin_tone is not None and lo <= p.monk_skin_tone <= hi
+        ]
+        if subset:
+            by_monk_band[label] = compute_stats(subset)
+
     devices = (
         "PULSE_OXIMETER",
         "SMART_WATCH",
@@ -379,6 +508,9 @@ def compute_stratified(
         overall_hrv=overall_hrv,
         by_quality=by_quality,
         by_fitzpatrick=by_fitzpatrick,
+        by_monk_band=by_monk_band,
+        ita_error_regression=regress_on_ita(pair_list, measure="abs_error"),
+        ita_snr_regression=regress_on_ita(pair_list, measure="snr"),
         by_reference_device=by_reference_device,
         by_posture=by_posture,
         by_time_of_day=by_time_of_day,

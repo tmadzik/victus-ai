@@ -156,6 +156,7 @@ async def record_calibration_pair(
         rppg_snr_pos_db=assessment.snr_pos_db,
         rppg_pipeline_version=assessment.pipeline_version,
         skin_tone_estimate=skin_tone,
+        ita_forehead_degrees=payload.ita_forehead_degrees,
         notes=payload.notes,
         study_session_id=active_session.id if active_session is not None else None,
     )
@@ -245,6 +246,13 @@ async def calibration_stats(
             reference_hr_bpm=r.reference_hr_bpm,
             quality=r.rppg_quality,
             skin_tone=r.skin_tone_estimate.value if r.skin_tone_estimate else None,
+            ita_degrees=r.ita_forehead_degrees,
+            monk_skin_tone=(
+                r.study_session.subject.monk_skin_tone if r.study_session else None
+            ),
+            # The selected method is whichever scored higher, so its SNR is the
+            # max — this is the signal quality the reported vitals came from.
+            rppg_snr_db=max(r.rppg_snr_chrom_db, r.rppg_snr_pos_db),
             reference_device_type=r.reference_device_type.value,
             rppg_hrv_rmssd_ms=r.rppg_hrv_rmssd_ms,
             reference_hrv_rmssd_ms=r.reference_hrv_rmssd_ms,
@@ -452,6 +460,7 @@ def _row_to_response(row: RppgCalibrationRecord) -> CalibrationRecordResponse:
             if row.skin_tone_estimate
             else None
         ),
+        ita_forehead_degrees=row.ita_forehead_degrees,
         notes=row.notes,
         error_bpm=round(row.rppg_hr_bpm - row.reference_hr_bpm, 3),
         hrv_error_ms=hrv_error,

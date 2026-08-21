@@ -58,7 +58,8 @@ def test_rows_to_matrix_handles_absent_optional_fields() -> None:
                 "snr_chrom_db": 6.0,
                 "snr_pos_db": 7.0,
                 "method_selected": "pos",
-                "skin_tone": "V",
+                "skin_tone": "V",  # recorded secondary — no longer a feature
+                "ita_degrees": -22.0,
                 "reference_hr_bpm": 76.0,
                 "reference_rr_bpm": None,  # absent target → NaN (masked in loss)
                 "reference_hrv_rmssd_ms": None,
@@ -74,18 +75,18 @@ def test_rows_to_matrix_handles_absent_optional_fields() -> None:
     assert not np.isnan(row.targets[0])  # HR truth present
     assert np.isnan(row.targets[1])  # RR truth absent → NaN sentinel
     assert row.features[6] == 1.0  # method_is_pos
-    assert row.features[7] == 5.0  # Fitzpatrick V → ordinal 5
+    assert row.features[7] == -22.0  # measured ITA°, not a Fitzpatrick ordinal
 
 
 def test_checkpoint_roundtrip_writes_meta(tmp_path: Path) -> None:
     result, _, report = _fit_eval(n=400)
-    out = tmp_path / "toi_corrector_v1.pt"
+    out = tmp_path / "toi_corrector_v2.pt"
     save_corrector_checkpoint(
         result, out, version="9.9.9", validation=report, n_train=320, n_val=80
     )
     assert out.exists()
     meta = json.loads(out.with_suffix(out.suffix + ".meta.json").read_text())
-    assert meta["model_kind"] == "toi_corrector_v1"
+    assert meta["model_kind"] == "toi_corrector_v2"
     assert meta["version"] == "9.9.9"
     assert meta["feature_names"] == list(FEATURE_NAMES)
     assert meta["target_names"] == list(TARGET_NAMES)

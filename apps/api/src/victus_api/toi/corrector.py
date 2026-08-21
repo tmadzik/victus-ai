@@ -54,7 +54,6 @@ class ToiCorrector:
 
         from victus_api.training.toi_corrector import (
             FEATURE_NAMES,
-            FITZPATRICK_ORDINAL,
             TARGET_NAMES,
             FeatureScaler,
             ToiCorrectorNet,
@@ -63,7 +62,19 @@ class ToiCorrector:
         meta_path = path.with_suffix(path.suffix + ".meta.json")
         meta = json.loads(meta_path.read_text())
         hidden = int(meta["hidden"])
-        self._fitz = FITZPATRICK_ORDINAL
+
+        # Refuse a checkpoint whose feature order differs from this build's.
+        # Previously only the *arity* was implied, so swapping a feature in
+        # place (as the Fitzpatrick → ITA move does) would silently feed values
+        # into a slot trained on something else — a wrong number, not an error.
+        ckpt_features = tuple(meta.get("feature_names", ()))
+        if ckpt_features and ckpt_features != tuple(FEATURE_NAMES):
+            raise ValueError(
+                f"Corrector checkpoint {path.name} was trained on features "
+                f"{ckpt_features}, but this build expects {tuple(FEATURE_NAMES)}. "
+                "Retrain the corrector, or pin a matching checkpoint."
+            )
+
         self.model_kind: str = str(meta["model_kind"])
         self.model_version: str = str(meta.get("version", "unknown"))
 
@@ -78,7 +89,7 @@ class ToiCorrector:
         )
 
     def correct(
-        self, pipeline: PipelineOutput, skin_tone: object | None
+        self, pipeline: PipelineOutput, ita_degrees: float | None
     ) -> CorrectedBiomarkers:
         """Return corrected biomarkers for the present targets.
 
@@ -104,8 +115,11 @@ class ToiCorrector:
             if pipeline.hrv_sdnn_ms is not None
             else float(mean[3])
         )
-        tone = getattr(skin_tone, "value", skin_tone)
-        fitz_ord = float(self._fitz.get(str(tone), 0)) if tone is not None else 0.0
+        # Unmeasured pigmentation falls back to the training-set mean, like the
+        # other optional inputs. The old scheme defaulted to Fitzpatrick I —
+        # lightest, smallest correction — which under-corrected precisely the
+        # captures least likely to carry a reading.
+        ita = float(ita_degrees) if ita_degrees is not None else float(mean[7])
         method_is_pos = 1.0 if pipeline.method_selected == "pos" else 0.0
 
         features = np.array(
@@ -117,7 +131,7 @@ class ToiCorrector:
                 float(pipeline.snr_chrom_db),
                 float(pipeline.snr_pos_db),
                 method_is_pos,
-                fitz_ord,
+                ita,
             ],
             dtype=np.float32,
         )
