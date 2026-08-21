@@ -17,6 +17,12 @@ export const UserRole = {
   CHW: 'CHW',
   CLINICIAN: 'CLINICIAN',
   ADMIN: 'ADMIN',
+  // Organisation-side roles (funder / insurer pathway). They belong to the
+  // client organisation, never to Victus, and exist only on a deployment bound
+  // to one. CARE_MANAGER is the only role that may open an individual member's
+  // risk state, and only behind the care-use attestation.
+  ORG_ADMIN: 'ORG_ADMIN',
+  CARE_MANAGER: 'CARE_MANAGER',
 } as const;
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 export const UserRoleSchema = z.nativeEnum(UserRole);
@@ -1521,3 +1527,64 @@ export const EnrollmentProfileSchema = z.object({
   enrolled_at: z.string(),
 });
 export type EnrollmentProfile = z.infer<typeof EnrollmentProfileSchema>;
+
+// ===========================================================================
+// Organisation cohort dashboard (funder / insurer pathway)
+// ===========================================================================
+
+/**
+ * A suppressed count. `null` means SUPPRESSED, not zero — the cell held fewer
+ * than k members, so it is withheld rather than shown. Zero is a real, safe
+ * value ("nobody in this category") and stays visible; conflating the two on a
+ * dashboard would turn a hidden cell into an apparent absence.
+ */
+export const SuppressedCountSchema = z.number().int().nonnegative().nullable();
+export type SuppressedCount = z.infer<typeof SuppressedCountSchema>;
+
+export const CellSuppressionReportSchema = z.object({
+  k: z.number().int(),
+  cells_in: z.number().int().nonnegative(),
+  cells_suppressed: z.number().int().nonnegative(),
+  complementary_suppressed: z.number().int().nonnegative(),
+});
+export type CellSuppressionReport = z.infer<typeof CellSuppressionReportSchema>;
+
+export const CohortReportSchema = z.object({
+  members_screened: z.number().int().nonnegative(),
+  triage_distribution: z.record(z.string(), SuppressedCountSchema),
+  by_age_band: z.record(z.string(), SuppressedCountSchema),
+  by_sex: z.record(z.string(), SuppressedCountSchema),
+  care_loop: CareLoopStatsSchema,
+  suppression: z.record(z.string(), CellSuppressionReportSchema),
+});
+export type CohortReport = z.infer<typeof CohortReportSchema>;
+
+export const AttestationStatusSchema = z.object({
+  active: z.boolean(),
+  version: z.string(),
+  /** Served by the API so no client ever holds a stale copy of the wording. */
+  text: z.string(),
+  expires_at: z.string().datetime({ offset: true }).nullable().optional(),
+});
+export type AttestationStatus = z.infer<typeof AttestationStatusSchema>;
+
+export const AttestationResponseSchema = z.object({
+  version: z.string(),
+  attested_at: z.string().datetime({ offset: true }),
+  expires_at: z.string().datetime({ offset: true }),
+});
+export type AttestationResponse = z.infer<typeof AttestationResponseSchema>;
+
+export const FlaggedMemberSchema = z.object({
+  user_id: z.string(),
+  triage_state: z.string(),
+  assessed_at: z.string(),
+});
+export type FlaggedMember = z.infer<typeof FlaggedMemberSchema>;
+
+export const FlaggedMemberListSchema = z.object({
+  members: z.array(FlaggedMemberSchema),
+  count: z.number().int().nonnegative(),
+  attestation_version: z.string(),
+});
+export type FlaggedMemberList = z.infer<typeof FlaggedMemberListSchema>;

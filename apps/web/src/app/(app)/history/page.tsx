@@ -9,7 +9,7 @@ import { getLocale } from '@/i18n';
 import { ApiError, apiClient } from '@/lib/api-client';
 import { auth } from '@/lib/auth';
 
-export const metadata = { title: 'Assessment history — Victus AI' };
+export const metadata = { title: 'Assessment history' };
 
 // The two list endpoints are consent-gated, so a participant who has only used
 // one pathway gets a 403 on the other. Treat that as "no records", not an error.
